@@ -5,9 +5,9 @@ dotenv.config();
 
 // execute tests on test database
 const dbPortEnvKey =
-  process.env.NODE_ENV === ENV_TEST ? 'TYPEORM_PORT_TEST' : 'TYPEORM_PORT';
+  process.env.NODE_ENV === ENV_TEST ? 'DB_PORT_TEST' : 'DB_PORT';
 
-export const AppDataSource = new DataSource({
+export const appDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST,
   port: parseInt(process.env[dbPortEnvKey], 10),
@@ -16,6 +16,6 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD,
   synchronize: false,
   entities: [process.env.TYPEORM_ENTITIES],
-  migrations: [process.env.TYPEORM_MIGRATIONS],
+  migrations: [process.env.TYPEORM_MIGRATIONS_JS],
   logging: process.env.TYPEORM_LOGGING === 'true',
 });

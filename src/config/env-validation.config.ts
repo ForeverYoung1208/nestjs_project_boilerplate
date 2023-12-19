@@ -15,7 +15,6 @@ export const envValidationConfig = Joi.object({
 
   SITE_ORIGIN: Joi.string().uri().required(),
 
-  DB_CONNECTION: Joi.string().valid('postgres').required(),
   DB_HOST: Joi.string().required(),
   DB_PORT: Joi.number().required(),
   DB_PORT_TEST: Joi.number(),
@@ -24,12 +23,6 @@ export const envValidationConfig = Joi.object({
   DB_PASSWORD: Joi.string().required(),
 
   TYPEORM_ENTITIES: Joi.string().required(),
-  TYPEORM_MIGRATIONS: Joi.string().required(),
+  TYPEORM_MIGRATIONS_JS: Joi.string().required(),
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),
-
-  // TYPEORM_MIGRATIONS_DIR: Joi.string().required(),
-  // TYPEORM_ENTITIES_DIR: Joi.string().required(),
-  // TYPEORM_ENTITIES_TS: Joi.string().required(),
-  // TYPEORM_SEEDING_FACTORIES: Joi.string().required(),
-  // TYPEORM_SEEDING_SEEDS: Joi.string().required(),
 });
