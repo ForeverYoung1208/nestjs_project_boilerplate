@@ -6,17 +6,18 @@ WORKDIR /usr/src/app
 
 EXPOSE 3001:3001
 
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# Bundle app source
+COPY ./src ./
+COPY ./src ./
 COPY package*.json ./
 COPY yarn.lock ./
+COPY ./tsconfig* ./
 
 # Install app dependencies
 #RUN npm install
-RUN npm install --global yarn
+RUN npm install --global yarn --force
 RUN yarn install --frozen-lockfile
 
-# Bundle app source
-COPY . .
 
 # Creates a "dist" folder with the production build
 RUN yarn build

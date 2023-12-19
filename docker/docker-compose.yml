@@ -37,3 +37,29 @@ services:
       - 8105:80
     depends_on:
       - postgres_1
+
+  # api:
+  #   container_name: udk2_api    
+  #   depends_on:
+  #     - postgres_1    
+  #   build:
+  #       context: ../
+  #       dockerfile: Dockerfile
+  #   networks:
+  #     par_net:
+  #       ipv4_address: 10.2.1.1
+  #   restart: always
+  #   environment:
+  #     DB_HOST: postgres_1
+  #     PORT: 3001
+  #     DB_PORT: 5432
+  #     DB_PORT_TEST: 54321
+  #     DB_DATABASE: UDK2
+  #     DB_USERNAME: postgres
+  #     DB_PASSWORD: asdfasdf
+  #     TYPEORM_ENTITIES: src/entities/**/*entity.ts
+  #     TYPEORM_MIGRATIONS: src/DB/migrations/**/*.ts
+  #     TYPEORM_LOGGING: true      
+  #   ports:
+  #     - "3001:3001"
+       
