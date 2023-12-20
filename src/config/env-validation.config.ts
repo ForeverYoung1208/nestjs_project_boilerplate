@@ -22,7 +22,5 @@ export const envValidationConfig = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
 
-  TYPEORM_ENTITIES: Joi.string().required(),
-  TYPEORM_MIGRATIONS_JS: Joi.string().required(),
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),
 });
