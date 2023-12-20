@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import config from './config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PostsModule } from './modules/posts/posts.module';
+import { PostsController } from './modules/posts/posts.controller';
 
 @Module({
   imports: [
@@ -17,14 +18,14 @@ import { PostsModule } from './modules/posts/posts.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const a = configService.get('databaseConfig');
-        console.log('[a]', a);
-        return a;
+        const databaseConfig = configService.get('databaseConfig');
+        console.log('[databaseConfig]', { ...databaseConfig, password: '***' });
+        return databaseConfig;
       },
     }),
     PostsModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, PostsController],
   providers: [AppService],
 })
 export class AppModule {}
