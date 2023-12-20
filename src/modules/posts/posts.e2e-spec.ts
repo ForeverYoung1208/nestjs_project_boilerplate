@@ -1,7 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import { appBuilder } from './helpers/default-app.factory';
-import { VALIDATION_PIPE_OPTIONS } from '../src/constants';
+import { appBuilder } from '../../../test/helpers/default-app.factory';
+import { VALIDATION_PIPE_OPTIONS } from '../../constants';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -13,7 +13,18 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect('OK');
+  it('(POST) /posts ', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/posts')
+      .send({
+        title: 'test',
+        content: 'test',
+      })
+      .expect(201);
+    expect(res.body).toEqual({
+      id: expect.any(Number),
+      title: 'test',
+      content: 'test',
+    });
   });
 });

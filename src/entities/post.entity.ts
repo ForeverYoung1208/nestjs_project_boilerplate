@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsString } from 'class-validator';
 import {
   Column,
   CreateDateColumn,
@@ -17,14 +18,17 @@ export class Post {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @IsString()
   @ApiProperty({ example: 'some title' })
   @Column()
   title: string;
 
+  @IsString()
   @ApiProperty({ example: 'some content' })
   @Column()
   content: string;
 
+  @IsBoolean()
   @ApiProperty({ example: true, nullable: true, default: true })
   @Column({ default: true, nullable: true })
   isActive: boolean;

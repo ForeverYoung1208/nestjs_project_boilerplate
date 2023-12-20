@@ -8,7 +8,7 @@ networks:
         - subnet: 10.2.0.0/16
 
 services:
-  postgres_1:
+  postgres_udk:
     build:
         context: postgres
         dockerfile: Dockerfile
@@ -22,10 +22,25 @@ services:
       POSTGRES_DB: UDK2
     ports:
       - "5432:5432"
+      
+  postgres_test:
+    build:
+        context: postgres
+        dockerfile: Dockerfile
+    networks:
+      par_net:
+        ipv4_address: 10.2.1.3
+    restart: always
+    environment:
+      POSTGRES_USER: postgres_test
+      POSTGRES_PASSWORD: asdfasdf_test
+      POSTGRES_DB: UDK2_test
+    ports:
+      - "54321:5432"
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: postgres_1    
+    container_name: pgadmin
     networks:
       par_net:
         ipv4_address: 10.2.1.4
@@ -36,7 +51,7 @@ services:
     ports:
       - 8105:80
     depends_on:
-      - postgres_1
+      - postgres_udk
 
   # api:
   #   container_name: udk2_api    

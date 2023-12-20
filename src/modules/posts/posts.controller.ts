@@ -9,7 +9,7 @@ import { PostsService } from './posts.service';
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  @Post()
+  @Post('posts')
   @ApiOperation({ summary: 'create new Post' })
   @ApiResponse({
     status: 201,
