@@ -1,0 +1,44 @@
+# Port for starting backend NestJs app
+PORT=3001
+# Possible states for NODE_ENV: local, test, development, staging, production
+NODE_ENV=local
+
+# Site address where frontend is. Used for CORS.
+SITE_ORIGIN=http://localhost:4000
+
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+IS_WORKER=false
+
+# TypeOrm configuration
+TYPEORM_LOGGING=true
+
+# TenantNames
+
+
+# Database connection parameters
+DB_MAIN_HOST=127.0.0.1
+DB_MAIN_PORT=5432
+DB_MAIN_DATABASE=UDK2
+DB_MAIN_USERNAME=postgres
+DB_MAIN_PASSWORD=asdfasdf
+
+DB_TEST_HOST=127.0.0.1
+DB_TEST_PORT=54321
+DB_TEST_DATABASE=UDK2_test
+DB_TEST_USERNAME=postgres_test
+DB_TEST_PASSWORD=asdfasdf_test
+
+DB_TENANT1_HOST=127.0.0.1
+DB_TENANT1_PORT=5432
+DB_TENANT1_DATABASE=UDK2_1
+DB_TENANT1_USERNAME=postgres
+DB_TENANT1_PASSWORD=asdfasdf
+
+DB_TENANT2_HOST=127.0.0.1
+DB_TENANT2_PORT=5432
+DB_TENANT2_DATABASE=UDK2_2
+DB_TENANT2_USERNAME=postgres
+DB_TENANT2_PASSWORD=asdfasdf
+
