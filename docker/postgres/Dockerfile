@@ -1,6 +1,7 @@
 FROM postgres:15.3 
 
 ENV PG_MAJOR 15
+ENV PGDATA /var/lib/postgresql/data
 
 # Install the postgresql debugger
 RUN apt-get update \

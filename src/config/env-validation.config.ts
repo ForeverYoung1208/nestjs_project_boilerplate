@@ -31,6 +31,10 @@ export const envValidationConfig = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
 
+  REDIS_HOST: Joi.string().required(),
+  REDIS_PORT: Joi.string().required(),
+  IS_WORKER: Joi.string().required().valid('true', 'false'),
+
   ...testEnvVars,
 
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),

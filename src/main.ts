@@ -8,12 +8,16 @@ import {
 } from './constants';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const currentEnv = configService.get('NODE_ENV');
+  const isWorker = configService.get('IS_WORKER');
+  Logger.verbose(
+    `Running in environment "${currentEnv}", isWorker: ${isWorker}`,
+  );
   app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
 
   // Load swagger, load only for local, staging and dev environments
@@ -32,7 +36,13 @@ async function bootstrap() {
       },
     });
   }
-
-  await app.listen(process.env.PORT);
+  if (isWorker !== 'true') {
+    await app.listen(process.env.PORT);
+    Logger.verbose(`listen to port ${configService.get('PORT')}`);
+  } else {
+    // await app.listen('3002');
+    await app.init();
+    Logger.verbose(`Worker not supposed to listen to any port`);
+  }
 }
 bootstrap();
