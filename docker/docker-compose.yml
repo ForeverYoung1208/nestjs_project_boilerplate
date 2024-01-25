@@ -7,7 +7,7 @@ networks:
         - subnet: 10.2.0.0/16
 
 services:
-  postgres_proj1:
+  postgres_udk:
     build:
         context: postgres
         dockerfile: Dockerfile
@@ -54,9 +54,9 @@ services:
     ports:
       - 8105:80
     depends_on:
-      - postgres_proj1
+      - postgres_udk
   
-  redis_proj1:
+  redis_udk:
     image: redis:7.2.4
     networks:
       par_net:
@@ -80,8 +80,8 @@ volumes:
   # api:
   #   container_name: udk2_api    
   #   depends_on:
-  #     - postgres_proj1
-  #     - redis_proj1
+  #     - postgres_udk
+  #     - redis_udk
   #   build:
   #       context: ../
   #       dockerfile: Dockerfile
@@ -91,7 +91,7 @@ volumes:
   #   restart: always
   #   environment:
   #     PORT: 3001
-  #     DB_HOST: postgres_proj1
+  #     DB_HOST: postgres_udk
   #     DB_HOST_TEST: postgres_test
   #     DB_PORT: 5432
   #     DB_PORT_TEST: 54321

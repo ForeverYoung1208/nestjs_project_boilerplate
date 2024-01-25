@@ -40,8 +40,6 @@ async function bootstrap() {
     await app.listen(process.env.PORT);
     Logger.verbose(`listen to port ${configService.get('PORT')}`);
   } else {
-    // await app.listen('3002');
-    await app.init();
     Logger.verbose(`Worker not supposed to listen to any port`);
   }
 }

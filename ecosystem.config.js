@@ -1,9 +1,9 @@
 module.exports = {
   apps: [
     {
-      name: 'proj1_test',
+      name: 'udk_test',
       script: './dist/main.js',
-      instances: 1,
+      instances: 2,
       watch: true,
       env: {
         NODE_ENV: 'staging',
@@ -11,9 +11,9 @@ module.exports = {
       },
     },
     {
-      name: 'proj1_worker',
+      name: 'udk_worker',
       script: './dist/main.js',
-      instances: 1,
+      instances: 2,
       watch: true,
       env: {
         NODE_ENV: 'staging',
