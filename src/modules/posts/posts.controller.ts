@@ -17,7 +17,6 @@ export class PostsController {
   })
   async create(@Body() createPostDto: CreatePostDto) {
     Logger.verbose(createPostDto, 'PostsController.create');
-    // await this.postsService.jobCreate(createPostDto);
-    await this.postsService.create(createPostDto);
+    await this.postsService.jobCreate(createPostDto);
   }
 }

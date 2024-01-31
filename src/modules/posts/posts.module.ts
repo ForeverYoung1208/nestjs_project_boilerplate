@@ -1,17 +1,17 @@
-import { Module, Scope } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Post } from '../../entities/post.entity';
 import { PostsController } from './posts.controller';
 import { PostsService } from './posts.service';
 import { BullModule } from '@nestjs/bull';
-import { DatabaseModule } from '../../database/database.module';
+import { PostsProcessorProvider } from '../../processors/posts.porcessor.provider';
 
 @Module({
   imports: [
-    DatabaseModule.register(Scope.REQUEST),
+    TypeOrmModule.forFeature([Post]),
     BullModule.registerQueue({ name: 'posts' }),
   ],
-  providers: [PostsController, PostsService],
+  providers: [PostsController, PostsService, PostsProcessorProvider],
   exports: [PostsController, PostsService],
   controllers: [PostsController],
 })

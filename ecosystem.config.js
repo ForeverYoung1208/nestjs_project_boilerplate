@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'udk_test',
       script: './dist/main.js',
-      instances: 2,
+      instances: 1,
       watch: true,
       env: {
         NODE_ENV: 'staging',
@@ -13,7 +13,7 @@ module.exports = {
     {
       name: 'udk_worker',
       script: './dist/main.js',
-      instances: 2,
+      instances: 1,
       watch: true,
       env: {
         NODE_ENV: 'staging',

@@ -10,10 +10,10 @@ import {
 const testEnvVars =
   process.env.NODE_ENV === ENV_TEST
     ? {
-        DB_TEST_PORT_TEST: Joi.number().required(),
-        DB_TEST_DATABASE_TEST: Joi.string().required(),
-        DB_TEST_USERNAME_TEST: Joi.string().required(),
-        DB_TEST_PASSWORD_TEST: Joi.string().required(),
+        DB_PORT_TEST: Joi.number().required(),
+        DB_DATABASE_TEST: Joi.string().required(),
+        DB_USERNAME_TEST: Joi.string().required(),
+        DB_PASSWORD_TEST: Joi.string().required(),
       }
     : {};
 
@@ -25,11 +25,11 @@ export const envValidationConfig = Joi.object({
 
   SITE_ORIGIN: Joi.string().uri().required(),
 
-  DB_MAIN_HOST: Joi.string().required(),
-  DB_MAIN_PORT: Joi.number().required(),
-  DB_MAIN_DATABASE: Joi.string().required(),
-  DB_MAIN_USERNAME: Joi.string().required(),
-  DB_MAIN_PASSWORD: Joi.string().required(),
+  DB_HOST: Joi.string().required(),
+  DB_PORT: Joi.number().required(),
+  DB_DATABASE: Joi.string().required(),
+  DB_USERNAME: Joi.string().required(),
+  DB_PASSWORD: Joi.string().required(),
 
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.string().required(),

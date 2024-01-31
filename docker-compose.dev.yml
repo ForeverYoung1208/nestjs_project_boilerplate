@@ -1,0 +1,99 @@
+version: '3'
+networks:
+  par_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.2.0.0/16
+
+services:
+  postgres:
+    build:
+        context: docker/postgres
+        dockerfile: Dockerfile
+    networks:
+      par_net:
+        ipv4_address: 10.2.1.2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: asdfasdf
+      POSTGRES_DB: UDK2
+    ports:
+      - "54322:5432"
+    volumes:
+    - ./docker/db:/var/lib/postgresql/data
+    tty: true 
+      
+  pgadmin:
+    image: dpage/pgadmin4
+    networks:
+      par_net:
+        ipv4_address: 10.2.1.4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: test@admin.org
+      PGADMIN_DEFAULT_PASSWORD: asdfasdf
+    ports:
+      - 8105:80
+    depends_on:
+      - postgres
+  
+  redis:
+    image: redis:7.2.4
+    networks:
+      par_net:
+        ipv4_address: 10.2.1.10
+    restart: always
+    ports:
+      - 63792:6379
+    # command: redis-server --save 60 1 
+    command: redis-server
+    volumes: 
+      - ./docker/redis:/data
+
+  api:
+    depends_on:
+      - postgres
+      - redis
+    build:
+      context: . 
+      dockerfile: Dockerfile.dev
+    networks:
+      par_net:
+        ipv4_address: 10.2.1.1
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      IS_WORKER: "false"
+      NODE_ENV: "staging"      
+    ports:
+      - "3001:3001"
+      - "9229:9229"
+    command: >
+      bash -c "node dist/main.js"
+
+  worker:
+    depends_on:
+      - api
+      - postgres
+      - redis
+    image: udk2-api-api:latest
+    networks:
+      par_net:
+        ipv4_address: 10.2.1.11
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: UDK2
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      IS_WORKER: "true"
+      NODE_ENV: "staging"
+    ports:
+      - "9230:9230"
+    command: >
+      bash -c "node dist/main.js"

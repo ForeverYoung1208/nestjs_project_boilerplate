@@ -16,10 +16,9 @@ async function bootstrap() {
   const currentEnv = configService.get('NODE_ENV');
   const isWorker = configService.get('IS_WORKER');
   Logger.verbose(
-    `Running in environment "${currentEnv}", isWorker: ${isWorker}`,
+    `== Running in environment "${currentEnv}", isWorker: ${isWorker}`,
   );
   app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
-
   // Load swagger, load only for local, staging and dev environments
   if ([ENV_LOCAL, ENV_STAGING, ENV_DEV].includes(currentEnv)) {
     const apiVersion = process.env.npm_package_version;
@@ -40,6 +39,8 @@ async function bootstrap() {
     await app.listen(process.env.PORT);
     Logger.verbose(`listen to port ${configService.get('PORT')}`);
   } else {
+    // await app.listen('3002');
+    await app.init();
     Logger.verbose(`Worker not supposed to listen to any port`);
   }
 }

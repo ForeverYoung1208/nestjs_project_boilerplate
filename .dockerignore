@@ -1,0 +1,3 @@
+./docker/db/
+./docker/db_test/
+./docker/redis/

@@ -14,17 +14,12 @@ describe('AppController (e2e)', () => {
   });
 
   it('(POST) /posts ', async () => {
-    const res = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post('/posts')
       .send({
         title: 'test',
         content: 'test',
       })
       .expect(201);
-    expect(res.body).toEqual({
-      id: expect.any(Number),
-      title: 'test',
-      content: 'test',
-    });
   });
 });

@@ -1,31 +1,28 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { Injectable, Logger } from '@nestjs/common';
+import { Repository } from 'typeorm';
 import { Post } from '../../entities/post.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 import { CreatePostDto } from './dtos/createPost.dto';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 
 @Injectable()
 export class PostsService {
-  private readonly postsRepositry: Repository<Post>;
   constructor(
-    @Inject('data_source')
-    private readonly dataSource: DataSource,
+    @InjectRepository(Post)
+    private readonly postsRepositry: Repository<Post>,
     @InjectQueue('posts')
     private postsQueue: Queue,
-  ) {
-    this.postsRepositry = dataSource.getRepository(Post);
-  }
+  ) {}
 
   async create(post: CreatePostDto): Promise<Post> {
-    const newPost = await this.postsRepositry.save(post);
-    return newPost;
+    return this.postsRepositry.save(post);
   }
 
   // JOB starters
 
   async jobCreate(createPostDto: CreatePostDto): Promise<void> {
-    const quedPost = await this.postsQueue.add(createPostDto);
+    const quedPost = await this.postsQueue.add(createPostDto, { attempts: 10 });
     Logger.debug(`------Job ${quedPost.id} created----------`);
     console.dir(quedPost.data);
   }
