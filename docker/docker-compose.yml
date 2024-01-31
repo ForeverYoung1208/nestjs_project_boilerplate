@@ -1,0 +1,84 @@
+version: '3.8'
+networks:
+  udk_net:
+    name: ${COMPOSE_PROJECT_NAME}_network
+    driver: bridge
+
+services:
+  api:
+    container_name: ${COMPOSE_PROJECT_NAME}_api
+    depends_on:
+      - postgres
+      - redis
+    build:
+      context: ./api
+      dockerfile: ./Dockerfile
+    volumes:
+      - ../:/app:rw
+    networks:
+      - udk_net
+    ports:
+      - ${API_PORT}:3001
+      - ${API_DEBUG_PORT}:9229
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    command: >
+      bash -c "yarn install --frozen-lockfile
+      && rm -rf dist
+      && nest start --debug 0.0.0.0:9229 --watch --preserveWatchOutput"
+
+  worker:
+    container_name: ${COMPOSE_PROJECT_NAME}_worker
+    depends_on:
+      - api
+      - postgres
+      - redis
+    build:
+      context: ./api
+      dockerfile: ./Dockerfile
+    networks:
+      - udk_net
+    volumes:
+      - ../:/app:rw
+    ports:
+      - ${WORKER_DEBUG_PORT}:9230
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379          
+    command: >
+      bash -c "nest start -c worker-cli.json --debug 0.0.0.0:9230 --watch --preserveWatchOutput"
+
+  postgres:
+    container_name: ${COMPOSE_PROJECT_NAME}_postgres
+    build:
+      context: postgres
+      dockerfile: Dockerfile
+    networks:
+      - udk_net
+    restart: always       
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - ${POSTGRES_PORT}:5432
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+    tty: true
+
+  redis:
+    container_name: ${COMPOSE_PROJECT_NAME}_redis
+    image: redis:7.2.4
+    networks:
+      - udk_net
+    restart: always
+    ports:
+      - ${REDIS_PORT}:6379
+    command: redis-server
+    volumes:
+      - ./redis/data:/data

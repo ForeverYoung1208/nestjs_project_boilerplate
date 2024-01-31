@@ -14,11 +14,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const currentEnv = configService.get('NODE_ENV');
-  const isWorker = configService.get('IS_WORKER');
-  Logger.verbose(
-    `== Running in environment "${currentEnv}", isWorker: ${isWorker}`,
-  );
+  const port = configService.get('PORT');
+
+  Logger.overrideLogger(new Logger('API'));
+
   app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
+
   // Load swagger, load only for local, staging and dev environments
   if ([ENV_LOCAL, ENV_STAGING, ENV_DEV].includes(currentEnv)) {
     const apiVersion = process.env.npm_package_version;
@@ -29,19 +30,13 @@ async function bootstrap() {
       .addBearerAuth()
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api/doc', app, document, {
-      swaggerOptions: {
-        persistAuthorization: true,
-      },
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: { persistAuthorization: true },
     });
   }
-  if (isWorker !== 'true') {
-    await app.listen(process.env.PORT);
-    Logger.verbose(`listen to port ${configService.get('PORT')}`);
-  } else {
-    // await app.listen('3002');
-    await app.init();
-    Logger.verbose(`Worker not supposed to listen to any port`);
-  }
+
+  await app.listen(port);
+
+  Logger.verbose(`listen to port ${port}`);
 }
 bootstrap();

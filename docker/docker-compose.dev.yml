@@ -1,0 +1,49 @@
+version: '3.8'
+networks:
+  udk_net:
+    name: ${COMPOSE_PROJECT_NAME}_network
+    driver: bridge
+
+services:
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  api:
+    extends:
+      file: docker-compose.yml
+      service: api
+    build:
+      context: ../
+      dockerfile: ./docker/api/Dockerfile.dev
+    command: >
+      bash -c "node dist/main.js"
+
+  worker:
+    image: udk-api:latest
+    extends:
+      file: docker-compose.yml
+      service: worker
+    command: >
+      bash -c "node dist/worker.js"
+
+
+  pgadmin:
+    container_name: ${COMPOSE_PROJECT_NAME}_pgadmin
+    image: dpage/pgadmin4
+    networks:
+      - udk_net
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_LOGIN}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - ${PGADMIN_PORT}:80
+    depends_on:
+      - postgres

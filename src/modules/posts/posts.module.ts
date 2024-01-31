@@ -4,14 +4,13 @@ import { Post } from '../../entities/post.entity';
 import { PostsController } from './posts.controller';
 import { PostsService } from './posts.service';
 import { BullModule } from '@nestjs/bull';
-import { PostsProcessorProvider } from '../../processors/posts.porcessor.provider';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Post]),
     BullModule.registerQueue({ name: 'posts' }),
   ],
-  providers: [PostsController, PostsService, PostsProcessorProvider],
+  providers: [PostsController, PostsService],
   exports: [PostsController, PostsService],
   controllers: [PostsController],
 })

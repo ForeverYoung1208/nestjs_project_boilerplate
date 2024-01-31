@@ -33,7 +33,6 @@ export const envValidationConfig = Joi.object({
 
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.string().required(),
-  IS_WORKER: Joi.string().required().valid('true', 'false'),
 
   ...testEnvVars,
 

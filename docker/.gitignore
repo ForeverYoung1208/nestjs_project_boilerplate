@@ -1,0 +1,7 @@
+# containers data
+/postgres/data
+/redis/data
+
+#
+.env.*
+!.env.example
