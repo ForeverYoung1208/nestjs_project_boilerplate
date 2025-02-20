@@ -10,9 +10,14 @@ export class PostsService {
     @InjectRepository(Post)
     private readonly postsRepositry: Repository<Post>,
   ) {}
+
   async create(createPostDto: CreatePostDto): Promise<Post> {
     const res = await this.postsRepositry.save(createPostDto);
     console.log(res);
     return res;
+  }
+
+  async findAll(): Promise<Post[]> {
+    return this.postsRepositry.find();
   }
 }

@@ -5,7 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ENV_DEV, ENV_LOCAL, ENV_STAGING } from './constants/system';
 import { validationPipeConfig } from './config/validation-pipe.config';
-import { AUTH_TYPES } from './modules/auth/constants';
+import { AuthTypes } from './modules/auth/constants';
 import { initializeTransactionalContext } from 'typeorm-transactional';
 
 async function bootstrap() {
@@ -34,10 +34,19 @@ async function bootstrap() {
           type: 'http',
           scheme: 'bearer',
           in: 'header',
-          bearerFormat: AUTH_TYPES.JWT,
+          bearerFormat: AuthTypes.JWT,
           description: 'Used for user auth',
         },
-        AUTH_TYPES.JWT,
+        AuthTypes.JWT,
+      )
+      .addApiKey(
+        {
+          type: 'apiKey',
+          name: 'x-api-key',
+          in: 'header',
+          description: 'Used for api key auth',
+        },
+        AuthTypes.API_KEY,
       )
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);

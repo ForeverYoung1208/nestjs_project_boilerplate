@@ -26,4 +26,6 @@ export const envValidationConfig = Joi.object({
   BULL_TASKS_TTL_DAYS: Joi.number(),
 
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),
+
+  API_KEY: Joi.string().required(),
 });

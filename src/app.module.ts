@@ -8,6 +8,7 @@ import { PostsModule } from './modules/posts/posts.module';
 import { PostsController } from './modules/posts/posts.controller';
 import { addTransactionalDataSource } from 'typeorm-transactional';
 import { DataSource } from 'typeorm';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { DataSource } from 'typeorm';
       dataSourceFactory: async (options) =>
         addTransactionalDataSource(new DataSource(options)),
     }),
+    AuthModule,
     PostsModule,
   ],
   controllers: [AppController, PostsController],
