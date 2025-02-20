@@ -15,6 +15,7 @@ import {
 
 @Entity()
 export class Post {
+  @ApiProperty({ example: 1 })
   @PrimaryGeneratedColumn()
   id: number;
 

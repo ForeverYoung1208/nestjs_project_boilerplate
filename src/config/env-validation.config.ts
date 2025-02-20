@@ -5,17 +5,7 @@ import {
   ENV_PROD,
   ENV_STAGING,
   ENV_TEST,
-} from '../constants';
-
-const testEnvVars =
-  process.env.NODE_ENV === ENV_TEST
-    ? {
-        DB_PORT_TEST: Joi.number().required(),
-        DB_DATABASE_TEST: Joi.string().required(),
-        DB_USERNAME_TEST: Joi.string().required(),
-        DB_PASSWORD_TEST: Joi.string().required(),
-      }
-    : {};
+} from '../constants/system';
 
 export const envValidationConfig = Joi.object({
   PORT: Joi.number().required(),
@@ -31,7 +21,9 @@ export const envValidationConfig = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
 
-  ...testEnvVars,
+  REDIS_HOST: Joi.string().required(),
+  REDIS_PORT: Joi.string().required(),
+  BULL_TASKS_TTL_DAYS: Joi.number(),
 
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),
 });
