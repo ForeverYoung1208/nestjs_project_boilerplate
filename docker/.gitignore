@@ -1,5 +1,5 @@
 # containers data
-/postgres/data
+/postgres/data*
 /redis/data
 
 #
