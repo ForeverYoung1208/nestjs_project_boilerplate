@@ -20,4 +20,8 @@ export class PostsService {
   async findAll(): Promise<Post[]> {
     return this.postsRepositry.find();
   }
+
+  async delete(id: number): Promise<void> {
+    await this.postsRepositry.delete(id);
+  }
 }

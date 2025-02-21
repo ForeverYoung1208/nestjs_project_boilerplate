@@ -20,8 +20,7 @@ export const appWithFakeFactoriesBuilder = async <
 
   const appModule = await Test.createTestingModule({
     imports: [AppModule, FakeEntitiesModule],
-  })
-    .compile();
+  }).compile();
 
   const app = appModule.createNestApplication();
 

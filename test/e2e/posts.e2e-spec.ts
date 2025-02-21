@@ -1,17 +1,19 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { appBuilder } from '../app-factories/default-app.factory';
+import { PostsService } from '../../src/modules/posts/posts.service';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
+  let postsService: PostsService;
   beforeAll(async () => {
     app = await appBuilder();
     await app.init();
+    postsService = app.get(PostsService);
   });
-  
   afterAll(async () => {
     await app.close();
-  })
+  });
 
   it('(POST) /posts ', async () => {
     const res = await request(app.getHttpServer())
@@ -26,5 +28,6 @@ describe('AppController (e2e)', () => {
       title: 'test',
       content: 'test',
     });
+    await postsService.delete(res.body.id);
   });
 });
