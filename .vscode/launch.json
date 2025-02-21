@@ -5,10 +5,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Attach",
-      "port": 9229,
       "request": "attach",
-      "address": "localhost",
+      "address": "127.0.0.1",
+      "name": "Attach to Remote 9229 (api)",
+      "port": 9229,
       "localRoot": "${workspaceFolder}",
       "remoteRoot": "/app",
       "skipFiles": [
@@ -16,5 +16,17 @@
       ],
       "type": "node"
     },
+    {
+      "request": "attach",
+      "address": "127.0.0.1",
+      "name": "Attach to Remote 9230 (tests)",
+      "port": 9230,
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": "/app",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node"
+    }
   ]
 }

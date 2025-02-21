@@ -10,7 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:worker": "nest start -c worker-cli.json",
-    "start:worker:debug": "nest start -c worker-cli.json --debug 0.0.0.0:9230 --watch --preserveWatchOutput",
+    "start:worker:debug": "nest start -c worker-cli.json --debug 0.0.0.0:9231 --watch --preserveWatchOutput",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug 0.0.0.0:9229 --watch --preserveWatchOutput",
     "start:prod": "node dist/main",
@@ -22,12 +22,12 @@
     "migration:revert": "yarn typeorm migration:revert",
     "migration:generate": "yarn typeorm migration:generate src/db/migrations/$npm_config_name",
     "migration:create": "yarn typeorm-ts-node-commonjs migration:create src/db/migrations/$npm_config_name",
-    "test:unit": "jest",
+    "test:unit": "jest --selectProjects api-unit",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json --run-in-band",
-    "test:int": "jest --config ./test/jest-int.json --run-in-band"
+    "test:e2e": "jest --selectProjects api-e2e --detectOpenHandles",
+    "test:int": "jest --selectProjects api-integration --detectOpenHandles:"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.2",
@@ -50,6 +50,7 @@
     "typeorm-transactional": "^0.5.0"
   },
   "devDependencies": {
+    "@faker-js/faker": "^9.5.0",
     "@nestjs/cli": "^11.0.4",
     "@nestjs/schematics": "^11.0.1",
     "@nestjs/testing": "^11.0.10",
@@ -78,15 +79,40 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "testTimeout": 50000,
+    "projects": [
+      {
+        "displayName": "api-e2e",
+        "testRegex": ".*\\.e2e-spec\\.ts$",
+        "transform": {
+          "^.+\\.ts": "ts-jest"
+        },
+        "maxWorkers": 1,
+        "rootDir": "test"
+      },
+      {
+        "displayName": "api-unit",
+        "testRegex": ".*\\.spec\\.ts$",
+        "transform": {
+          "^.+\\.ts": "ts-jest"
+        },
+        "maxWorkers": 1,
+        "rootDir": "src"
+      },
+      {
+        "displayName": "api-integration",
+        "testRegex": ".*\\.int-spec\\.ts$",
+        "transform": {
+          "^.+\\.ts": "ts-jest"
+        },
+        "maxWorkers": 1,
+        "rootDir": "test"
+      }
+    ]
   }
 }

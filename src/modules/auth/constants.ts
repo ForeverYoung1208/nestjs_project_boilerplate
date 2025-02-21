@@ -1,6 +1,5 @@
 export enum AuthTypes {
   JWT = 'JWT',
-  BASIC = 'BASIC',
   API_KEY = 'API_KEY',
 }
 

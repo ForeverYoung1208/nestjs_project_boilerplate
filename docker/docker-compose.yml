@@ -14,6 +14,7 @@ services:
     ports:
       - ${COMPOSE_API_PORT}:3000
       - ${COMPOSE_API_DEBUG_PORT}:9229
+      - ${COMPOSE_API_DEBUG_TESTS_PORT}:9230
     command: >
       bash -c "npm ci
       && rm -rf dist
@@ -26,7 +27,7 @@ services:
     volumes:
       - ../:/app
     ports:
-      - ${COMPOSE_WORKER_DEBUG_PORT}:9230
+      - ${COMPOSE_WORKER_DEBUG_PORT}:9231
     command: >
       bash -c "npm run start:worker:debug"
     environment:

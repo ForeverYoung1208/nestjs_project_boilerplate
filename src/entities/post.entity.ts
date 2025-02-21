@@ -13,7 +13,7 @@ import {
 // Note that responce properties must be defined at the corresponding responce.ts files
 // in order to strictly control output data.
 
-@Entity()
+@Entity('posts')
 export class Post {
   @ApiProperty({ example: 1 })
   @PrimaryGeneratedColumn()
@@ -31,12 +31,12 @@ export class Post {
 
   @IsBoolean()
   @ApiProperty({ example: true, nullable: true, default: true })
-  @Column({ default: true, nullable: true })
+  @Column({ name: 'is_active', default: true, nullable: true })
   isActive: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn()
-  updated_at: Date;
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 }
