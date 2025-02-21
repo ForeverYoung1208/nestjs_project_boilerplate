@@ -10,6 +10,9 @@ export class CreatePostResponce extends Post {
   @Expose()
   title;
 
+  @Expose()
+  content;
+
   static fromPost(
     post: Post | Post[],
   ): CreatePostResponce | CreatePostResponce[] {

@@ -5,7 +5,7 @@ import { appBuilder } from '../app-factories/default-app.factory';
 describe('AppController (e2e)', () => {
   let app: INestApplication;
   beforeAll(async () => {
-    const app =  await appBuilder();
+    app = await appBuilder();
     await app.init();
   });
   
