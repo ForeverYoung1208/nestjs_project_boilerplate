@@ -27,6 +27,18 @@
         "<node_internals>/**"
       ],
       "type": "node"
+    },
+    {
+      "request": "attach",
+      "address": "127.0.0.1",
+      "name": "Attach to Remote 9231 (worker)",
+      "port": 9231,
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": "/app",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "node"
     }
   ]
 }

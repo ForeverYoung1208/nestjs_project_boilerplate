@@ -14,13 +14,14 @@ export class EmailProcessor extends WorkerHost{
   }
   async process(job: Job<any, any, string>): Promise<void> {
     switch (job.name) {
-      case EMAIL_SEND_JOB_NAME: {
-        const res = await this.mailerService.sendMail(job.data)
-        Logger.log(res)
-      }
-      default: {
+      case EMAIL_SEND_JOB_NAME:
+        const res = await this.mailerService.sendMail(job.data);
+        Logger.log(
+          `Email sent to ${job.data.to} with subject ${job.data.subject}`,
+        );
+        break;
+      default:
         Logger.log(`Unknown job name: ${job.name}`);
-      }
     }
     
   }

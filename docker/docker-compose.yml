@@ -69,6 +69,8 @@ services:
       - ./redis/data:/data
     
   maildev:
+    networks:
+      - net    
     image: maildev/maildev
     ports:
       - 1080:1080

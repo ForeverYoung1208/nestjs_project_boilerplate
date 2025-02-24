@@ -15,7 +15,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
       useFactory: (configService: ConfigService) =>
         configService.get('mailerConfig')(),
     }),
-    
+
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
