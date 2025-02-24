@@ -67,3 +67,8 @@ services:
       service: redis
     volumes:
       - ./redis/data:/data
+    
+  maildev:
+    image: maildev/maildev
+    ports:
+      - 1080:1080

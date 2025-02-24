@@ -5,6 +5,7 @@ import {
   ENV_PROD,
   ENV_STAGING,
   ENV_TEST,
+  MailerTransport,
 } from '../constants/system';
 
 export const envValidationConfig = Joi.object({
@@ -28,4 +29,15 @@ export const envValidationConfig = Joi.object({
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),
 
   API_KEY: Joi.string().required(),
+
+  MAILER_TRANSPORT: Joi.string().valid(...Object.values(MailerTransport)),
+  MAIL_HOST: Joi.string().required(),
+  MAIL_PORT: Joi.string().required(),
+  MAIL_ENCRYPTION: Joi.string().valid('true', 'false').default('false'),
+  MAIL_TLS: Joi.string().valid('true', 'false').default('true'),
+  MAIL_USERNAME: Joi.string().required(),
+  MAIL_PASSWORD: Joi.string().required(),
+  MAIL_FROM_EMAIL: Joi.string().required(),
+
+  COMPANY_NAME: Joi.string().required(),
 });

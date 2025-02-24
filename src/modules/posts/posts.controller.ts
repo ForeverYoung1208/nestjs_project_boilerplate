@@ -13,6 +13,7 @@ export class PostsController {
 
   @Post()
   @ApiOperation({ summary: 'create new Post' })
+  @ApiKeyAuth()
   @ApiResponse({
     status: 201,
     description: 'The record has been successfully created.',
