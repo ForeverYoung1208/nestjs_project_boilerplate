@@ -24,13 +24,28 @@ export const getTransport = (): TransportType => {
     };
   }
   return {
-    jsonTransport: true,
-    logger: true,
-    debug: true,
-    send: (mail: MailMessage) => {
-      Logger.log(
-        `MAIL LOG: from:${mail.data.from}, to: ${mail.data.to}, subj: ${mail.data.subject}`,
-      );
+    name: 'test',
+    version: '1.0.0',
+    plugin: true,
+    send: async (mail: MailMessage, callback: Function) => {
+      try {
+        Logger.log(
+          `MAIL LOG: from:${mail.data.from}, to: ${mail.data.to}, subj: ${mail.data.subject}, template: ${mail.data.template}`,
+        );
+        Logger.log(mail.data.context);
+        const info = {
+          messageId: `TEST-${Date.now()}`,
+          envelope: mail.data,
+          accepted: [mail.data.to],
+          rejected: [],
+          pending: [],
+          response: 'Message logged successfully',
+        };
+
+        callback(null, info);
+      } catch (error) {
+        callback(error);
+      }
     },
   };
 };

@@ -9,7 +9,7 @@ export const queueConfig = (): BullRootModuleOptions => ({
   defaultJobOptions: {
     attempts: 3,
     backoff: {
-      delay: 60000,
+      delay: 1000,
       type: 'exponential',
     },
     removeOnComplete: {

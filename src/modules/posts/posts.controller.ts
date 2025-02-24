@@ -20,7 +20,6 @@ export class PostsController {
     type: CreatePostResponce,
   })
   async create(@Body() createPostDto: CreatePostDto) {
-    Logger.verbose(createPostDto, 'PostsController.create');
     const createdPost = await this.postsService.create(createPostDto);
     return CreatePostResponce.fromPost(createdPost);
   }
