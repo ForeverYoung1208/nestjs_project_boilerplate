@@ -21,7 +21,7 @@ import {
   databaseUsername,
 } from '../config';
 
-export class InfraStack extends cdk.Stack {
+export class BoilerplateStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -258,7 +258,7 @@ export class InfraStack extends cdk.Stack {
     });
 
     const redis = new elasticache.CfnCacheCluster(this, 'RedisCluster', {
-      cacheNodeType: 't4g.micro',
+      cacheNodeType: 'cache.t3.micro',
       engine: 'redis',
       numCacheNodes: 1,
       vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId],
