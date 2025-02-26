@@ -1,3 +1,5 @@
+# Local environment
+
 # Base image
 FROM node:22.14-alpine3.21
 
