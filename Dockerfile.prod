@@ -26,6 +26,3 @@ RUN npm run build
 
 # Optional: remove dev dependencies for smaller image
 RUN npm prune --omit=dev
-
-# Start the server using the production build
-CMD ["npm", "run", "start:prod"]

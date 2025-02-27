@@ -3,11 +3,13 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { buildDocker } from './build-docker';
 import { Construct } from 'constructs';
 import {
@@ -19,6 +21,8 @@ import {
   userDeploerName,
   secretName,
   databaseUsername,
+  nodeEnv,
+  companyName,
 } from '../config';
 
 export class BoilerplateStack extends cdk.Stack {
@@ -196,27 +200,58 @@ export class BoilerplateStack extends cdk.Stack {
       { taskRole },
     );
 
+    const mailPasswordSecret = new secretsmanager.Secret(
+      this,
+      'MailPasswordSecret',
+      {
+        description: 'Mail password for the API service',
+      },
+    );
+    mailPasswordSecret.grantRead(apiTaskDefinition.taskRole);
+
     apiTaskDefinition.addContainer('ApiContainer', {
       image: ecs.ContainerImage.fromRegistry(dockerHubImage),
+      command: ['/bin/sh', '-c', 'npm run migration:run && npm run start:prod'],
       memoryLimitMiB: 512,
       cpu: 256,
       environment: {
-        DATABASE_HOST: dbCluster.clusterEndpoint.hostname,
-        DATABASE_PORT: '5432',
-        DATABASE_NAME: databaseName,
+        PORT: '3000',
+        NODE_ENV: nodeEnv,
+        SITE_ORIGIN: `https://${subDomainNameApi}`,
+        DB_HOST: dbCluster.clusterEndpoint.hostname,
+        DB_PORT: '5432',
+        DB_DATABASE: databaseName,
+        // REDIS_HOST: set at the redis section below
+        // REDIS_PORT: set at the redis section below
+        TYPEORM_LOGGING: 'false',
+        API_KEY: 'asdfasdf',
+        MAILER_TRANSPORT: 'smtp',
+        MAIL_HOST: 'smtp-pulse.com',
+        MAIL_PORT: '2525',
+        MAIL_ENCRYPTION: 'false',
+        MAIL_TLS: 'true',
+        MAIL_USERNAME: 'siafin2010@gmail.com',
+        MAIL_FROM_EMAIL: 'ihor.shcherbyna@clockwise.software',
+        COMPANY_NAME: companyName,
+        // todo: read stuff from .env
       },
       secrets: {
         // Get credentials from Secrets Manager
-        DATABASE_USERNAME: ecs.Secret.fromSecretsManager(
+        MAIL_PASSWORD: ecs.Secret.fromSecretsManager(mailPasswordSecret),
+        DB_USERNAME: ecs.Secret.fromSecretsManager(
           dbCluster.secret!,
           'username',
         ),
-        DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(
+        DB_PASSWORD: ecs.Secret.fromSecretsManager(
           dbCluster.secret!,
           'password',
         ),
       },
       portMappings: [{ containerPort: 3000 }],
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'api-container',
+        logRetention: logs.RetentionDays.ONE_WEEK,
+      }),
     });
 
     const apiService = new ecs.FargateService(this, 'ApiService', {
@@ -224,7 +259,11 @@ export class BoilerplateStack extends cdk.Stack {
       taskDefinition: apiTaskDefinition,
       desiredCount: 1,
       securityGroups: [apiSecurityGroup],
+      healthCheckGracePeriod: cdk.Duration.seconds(60), // Give time for DB connection
     });
+
+    // Make service depend on DB cluster
+    apiService.node.addDependency(dbCluster);
 
     // Attach API Service to Load Balancer via HTTPS
     httpsListener.addTargets('ApiTarget', {
@@ -245,6 +284,7 @@ export class BoilerplateStack extends cdk.Stack {
     });
 
     // Allow API Service to connect to DB
+    // todo take port from config or .env
     dbCluster.connections.allowFrom(apiSecurityGroup, ec2.Port.tcp(5432));
 
     /**
