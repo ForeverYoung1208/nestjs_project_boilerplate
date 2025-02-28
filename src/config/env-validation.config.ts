@@ -5,17 +5,8 @@ import {
   ENV_PROD,
   ENV_STAGING,
   ENV_TEST,
-} from '../constants';
-
-const testEnvVars =
-  process.env.NODE_ENV === ENV_TEST
-    ? {
-        DB_PORT_TEST: Joi.number().required(),
-        DB_DATABASE_TEST: Joi.string().required(),
-        DB_USERNAME_TEST: Joi.string().required(),
-        DB_PASSWORD_TEST: Joi.string().required(),
-      }
-    : {};
+  MailerTransport,
+} from '../constants/system';
 
 export const envValidationConfig = Joi.object({
   PORT: Joi.number().required(),
@@ -31,7 +22,22 @@ export const envValidationConfig = Joi.object({
   DB_USERNAME: Joi.string().required(),
   DB_PASSWORD: Joi.string().required(),
 
-  ...testEnvVars,
+  REDIS_HOST: Joi.string().required(),
+  REDIS_PORT: Joi.string().required(),
+  BULL_TASKS_TTL_DAYS: Joi.number(),
 
   TYPEORM_LOGGING: Joi.string().valid('true', 'false'),
+
+  API_KEY: Joi.string().required(),
+
+  MAILER_TRANSPORT: Joi.string().valid(...Object.values(MailerTransport)),
+  MAIL_HOST: Joi.string().required(),
+  MAIL_PORT: Joi.string().required(),
+  MAIL_ENCRYPTION: Joi.string().valid('true', 'false').default('false'),
+  MAIL_TLS: Joi.string().valid('true', 'false').default('true'),
+  MAIL_USERNAME: Joi.string().required(),
+  MAIL_PASSWORD: Joi.string().required(),
+  MAIL_FROM_EMAIL: Joi.string().required(),
+
+  COMPANY_NAME: Joi.string().required(),
 });

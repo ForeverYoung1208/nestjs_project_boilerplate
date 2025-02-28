@@ -1,22 +1,21 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, PickType } from '@nestjs/swagger';
 import { Post } from '../../../entities/post.entity';
 import { Exclude, Expose, plainToInstance } from 'class-transformer';
 
 @Exclude()
-export class CreatePostResponce {
+export class CreatePostResponce extends Post {
   @Expose()
-  @ApiProperty({ example: 123 })
-  id: number;
+  id;
 
   @Expose()
-  @ApiProperty({ example: 'some title' })
-  title: string;
+  title;
 
   @Expose()
-  @ApiProperty({ example: 'some content' })
-  content: string;
+  content;
 
-  static fromPost(post: Post): CreatePostResponce {
+  static fromPost(
+    post: Post | Post[],
+  ): CreatePostResponce | CreatePostResponce[] {
     const res = plainToInstance(CreatePostResponce, post, {
       excludeExtraneousValues: true,
     });

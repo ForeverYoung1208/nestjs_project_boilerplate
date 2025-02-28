@@ -1,22 +1,30 @@
+
+
 ## MIGRATIONS
-create new empty migration with name 'asdf'.
-This command must use exactly `npm run` because yarn doesn't support parameters:
+
+run migrations in docker's bash
+```bash
+$ docker compose -f docker/docker-compose.yml exec api bash
+```
+or change .env param  `DB_HOST=postgres` to `DB_HOST=localhost` to make postrges accesible locally
+don't forget to build project (`npm run build`) every tyime before generating or running migrtions because they run using built data (/dist)
+
+### create new empty migration with name 'asdf'.
 ```bash
 $ npm run migration:create --name=asdf
 ```
 
-generate new migration  with name 'asdf' from schema changes.
-This command must use exactly `npm run` because yarn doesn't support parameters:
+### generate new migration  with name 'asdf' from schema changes.
 ```bash
-$ npm run migration:g --name=asdf
+$ npm run migration:generate --name=asdf
 ```
 
-Run all new migrations:
+### Run all new migrations:
 ```bash
-$ yarn migration:run
+$ npm run migration:run
 ```
 
-Revert last migration:
+### Revert last migration:
 ```bash
-$ yarn migration:revert
+$ npm run migration:revert
 ```
