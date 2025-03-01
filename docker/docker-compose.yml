@@ -33,10 +33,10 @@ services:
     environment:
       NODE_DEBUG: bull
 
-  postgres:
+  db:
     extends:
       file: base-docker-compose.yml
-      service: postgres
+      service: db
     volumes:
       - ./postgres/data:/var/lib/postgresql/data
     environment:
@@ -50,7 +50,7 @@ services:
   postgres_test:
     extends:
       file: base-docker-compose.yml
-      service: postgres
+      service: db
     container_name: ${COMPOSE_PROJECT_NAME}_postgres_test      
     volumes:
       - ./postgres/data_tests:/var/lib/postgresql/data
