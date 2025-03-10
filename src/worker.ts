@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { initializeTransactionalContext } from 'typeorm-transactional';
 import { WorkerModule } from './worker/processors/worker.module';
 
-async function bootstrap() {
+export async function bootstrapWorker() {
   initializeTransactionalContext();
 
   const app = await NestFactory.createApplicationContext(WorkerModule);
@@ -13,4 +13,4 @@ async function bootstrap() {
 
   await app.init();
 }
-bootstrap();
+bootstrapWorker();
