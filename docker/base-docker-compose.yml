@@ -8,7 +8,7 @@ services:
   api:
     container_name: ${COMPOSE_PROJECT_NAME}_api
     depends_on:
-      - postgres
+      - db
       - redis
     build:
       context: ./api
@@ -25,7 +25,7 @@ services:
   worker:
     container_name: ${COMPOSE_PROJECT_NAME}_worker
     depends_on:
-      - postgres
+      - db
       - redis
     build:
       context: ./api
@@ -36,8 +36,8 @@ services:
     command: >
       bash -c "nest start:worker"
 
-  postgres:
-    container_name: ${COMPOSE_PROJECT_NAME}_postgres
+  db:
+    container_name: ${COMPOSE_PROJECT_NAME}_db
     build:
       context: ./postgres
       dockerfile: Dockerfile
@@ -68,7 +68,7 @@ services:
     ports:
       - ${COMPOSE_PGADMIN_PORT}:80
     depends_on:
-      - postgres
+      - db
 
   build-project:
     container_name: ${COMPOSE_PROJECT_NAME}_api_builder
