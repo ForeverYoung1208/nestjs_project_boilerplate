@@ -586,10 +586,17 @@ export class BoilerplateStack extends cdk.Stack {
       value: bastion.instancePublicIp,
     });
 
-    // Output the private key using Fn.getAtt
+    // Output just the key name instead of trying to get the private key
     new cdk.CfnOutput(this, 'BastionSSHKeyOutput', {
-      value: cdk.Fn.getAtt(keyPair.logicalId, 'PrivateKey').toString(),
-      description: 'Private key for SSH access to bastion host',
+      value: keyPair.keyName,
+      description:
+        'Key pair name for SSH access to bastion host. Get the private key from SSM Parameter Store.',
+    });
+
+    // Add output for the command to retrieve the private key
+    new cdk.CfnOutput(this, 'SSHKeyCommand', {
+      value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.getAtt('KeyPairId')} --with-decryption --query Parameter.Value --output text`,
+      description: 'Command to get the private key from SSM Parameter Store',
     });
   }
 
