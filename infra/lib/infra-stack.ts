@@ -27,7 +27,13 @@ export class BoilerplateStack extends cdk.Stack {
     super(scope, id, props);
 
     /**
+     *
+     *
+     *
      * COMMON
+     *
+     *
+     *
      */
 
     // Add tag for cost tracking
@@ -47,7 +53,13 @@ export class BoilerplateStack extends cdk.Stack {
     );
 
     /**
+     *
+     *
+     *
      * NETWORKS
+     *
+     *
+     *
      */
 
     // VPC
@@ -92,7 +104,6 @@ export class BoilerplateStack extends cdk.Stack {
       {
         vpc,
         description: 'Security group for Worker',
-        allowAllOutbound: true,
       },
     );
 
@@ -108,7 +119,13 @@ export class BoilerplateStack extends cdk.Stack {
     );
 
     /**
+     *
+     *
+     *
      * DATABASE
+     *
+     *
+     *
      */
 
     const engine = rds.DatabaseClusterEngine.auroraPostgres({
@@ -161,8 +178,27 @@ export class BoilerplateStack extends cdk.Stack {
       0,
     );
 
+    // assign necessary access permissions
+    dbCluster.connections.allowFrom(
+      apiSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow database access from API',
+    );
+
+    dbCluster.connections.allowFrom(
+      workerSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow database access from Worker',
+    );
+
     /**
+     *
+     *
+     *
      *  QUEUE
+     *
+     *
+     *
      */
 
     // ElastiCache Redis
@@ -193,7 +229,13 @@ export class BoilerplateStack extends cdk.Stack {
     });
 
     /**
+     *
+     *
+     *
      *  API
+     *
+     *
+     *
      */
 
     // Create an S3 asset for application code
@@ -212,7 +254,28 @@ export class BoilerplateStack extends cdk.Stack {
         '**/*.spec.ts',
         // add any other files/folders you want to exclude
       ],
-      followSymlinks: cdk.SymlinkFollowMode.NEVER,
+      bundling: {
+        image: cdk.DockerImage.fromRegistry(
+          'public.ecr.aws/docker/library/node:22',
+        ),
+        user: 'root',
+        command: [
+          'bash',
+          '-c',
+          [
+            'set -ex', // Enable debugging output
+            'cp /asset-input/package*.json /asset-output/',
+            'cd /asset-output',
+            'npm i -g @nestjs/cli',
+            'npm ci --production',
+            'cp -r /asset-input/src /asset-output/',
+            'cp -r /asset-input/tsconfig*.json /asset-output/',
+            'npm run build',
+            'rm -rf src/ tsconfig*.json', // Remove source files after build
+            'rm -rf node_modules/@types', // Remove type definitions to reduce size
+          ].join(' && '),
+        ],
+      },
     });
 
     // Create IAM role for EC2 instances
@@ -370,12 +433,17 @@ export class BoilerplateStack extends cdk.Stack {
         environmentName: `${projectName}-Worker-Environment`,
         applicationName: app.applicationName,
         solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
+        tier: {
+          // Add this tier configuration
+          name: 'Worker',
+          type: 'SQS/HTTP',
+        },
         optionSettings: [
           ...commonOptionSettings,
           {
             namespace: 'aws:ec2:vpc',
             optionName: 'Subnets',
-            value: vpc.privateSubnets
+            value: vpc.isolatedSubnets
               .map((subnet) => subnet.subnetId)
               .join(','),
           },
@@ -401,40 +469,13 @@ export class BoilerplateStack extends cdk.Stack {
     );
 
     /**
-     * Finalize access and dependancy
-     */
-
-    // assign necessary access permissions
-    dbCluster.connections.allowFrom(
-      apiSecurityGroup,
-      ec2.Port.tcp(5432),
-      'Allow database access from API',
-    );
-
-    dbCluster.connections.allowFrom(
-      workerSecurityGroup,
-      ec2.Port.tcp(5432),
-      'Allow database access from Worker',
-    );
-
-    new route53.ARecord(this, 'ApiAlias', {
-      zone,
-      recordName: subDomainNameApi,
-      target: route53.RecordTarget.fromAlias(
-        new targets.ElasticBeanstalkEnvironmentEndpointTarget(
-          `${apiEnvironment.environmentName}.${this.region}.elasticbeanstalk.com`,
-        ),
-      ),
-    });
-
-    workerEnvironment.addDependency(
-      // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
-      dbCluster.node.defaultChild as cdk.CfnResource,
-    );
-    workerEnvironment.addDependency(redis);
-
-    /**
+     *
+     *
+     *
      * Bastion instance for debugging purposes
+     *
+     *
+     *
      */
     const bastionSecurityGroup = new ec2.SecurityGroup(
       this,
@@ -494,7 +535,51 @@ export class BoilerplateStack extends cdk.Stack {
     );
 
     /**
+     *
+     *
+     *
+     * Finalize access and dependancies
+     *
+     *
+     *
+     */
+
+    new route53.ARecord(this, 'ApiAlias', {
+      zone,
+      recordName: subDomainNameApi,
+      target: route53.RecordTarget.fromAlias(
+        new targets.ElasticBeanstalkEnvironmentEndpointTarget(
+          `${apiEnvironment.environmentName}.${this.region}.elasticbeanstalk.com`,
+        ),
+      ),
+    });
+
+    // Add explicit dependencies
+    workerEnvironment.addDependency(
+      workerSecurityGroup.node.defaultChild as cdk.CfnResource,
+    );
+    workerEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
+
+    // Also add dependency for API environment
+    apiEnvironment.addDependency(
+      apiSecurityGroup.node.defaultChild as cdk.CfnResource,
+    );
+    apiEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
+
+    workerEnvironment.addDependency(
+      // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
+      dbCluster.node.defaultChild as cdk.CfnResource,
+    );
+    workerEnvironment.addDependency(redis);
+
+    /**
+     *
+     *
+     *
      *  Outputs
+     *
+     *
+     *
      */
     // Bastion's public IP to connect
     new cdk.CfnOutput(this, 'BastionPublicIP', {
