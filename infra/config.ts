@@ -1,14 +1,6 @@
 // project name (any) - will be used as part of naming for some resources like docker image, database, etc.
 export const projectName = 'boilerplate';
 
-// dockerHub username (you must have it registered at dockerhub)
-export const dockerHubUsername = 'foreveryoung1208';
-
-// dockerHub image parameters (any)
-export const imageName = projectName;
-export const imageTag = 'latest';
-export const dockerHubImage = `${dockerHubUsername}/${imageName}:${imageTag}`;
-
 // define your registered domain (you must have one at Route53)
 export const domainName = 'for-test.click';
 

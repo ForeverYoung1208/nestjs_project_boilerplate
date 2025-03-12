@@ -8,6 +8,7 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as s3assets from 'aws-cdk-lib/aws-s3-assets';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import {
   databaseName,
@@ -51,8 +52,21 @@ export class BoilerplateStack extends cdk.Stack {
 
     // VPC
     const vpc = new ec2.Vpc(this, 'MyVPC', {
-      maxAzs: 2,
-      natGateways: 1,
+      ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
+      maxAzs: 2, // Need 2 AZs for Aurora
+      natGateways: 0,
+      subnetConfiguration: [
+        {
+          cidrMask: 24,
+          name: 'Public',
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+        {
+          cidrMask: 23,
+          name: 'Private',
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED, // Use PRIVATE_ISOLATED instead of PRIVATE_WITH_EGRESS - no need for aura and redis to access internet
+        },
+      ],
     });
 
     //Lookup the zone based on domain name
@@ -71,6 +85,16 @@ export class BoilerplateStack extends cdk.Stack {
       description: 'Serurity group for API',
       allowAllOutbound: true,
     });
+
+    const workerSecurityGroup = new ec2.SecurityGroup(
+      this,
+      'WorkerSecurityGroup',
+      {
+        vpc,
+        description: 'Security group for Worker',
+        allowAllOutbound: true,
+      },
+    );
 
     apiSecurityGroup.addIngressRule(
       ec2.Peer.anyIpv4(),
@@ -91,9 +115,28 @@ export class BoilerplateStack extends cdk.Stack {
       version: rds.AuroraPostgresEngineVersion.VER_15_7,
     });
     // Aurora PostgreSQL Serverless
+    const dbSecurityGroup = new ec2.SecurityGroup(
+      this,
+      'DatabaseSecurityGroup',
+      {
+        vpc,
+        description: 'Security group for RDS',
+        allowAllOutbound: true,
+      },
+    );
+
+    dbSecurityGroup.addIngressRule(
+      apiSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from API',
+    );
     const dbCluster = new rds.DatabaseCluster(this, 'AuroraDB', {
       engine,
       vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      },
+      securityGroups: [dbSecurityGroup],
       writer: rds.ClusterInstance.serverlessV2('writer'),
       serverlessV2MinCapacity: 0.5, // Minimum ACU (0.5 is the minimum?)
       serverlessV2MaxCapacity: 1, // Maximum ACU
@@ -144,7 +187,7 @@ export class BoilerplateStack extends cdk.Stack {
         'RedisSubnetGroup',
         {
           description: 'Subnet group for Redis cluster',
-          subnetIds: vpc.privateSubnets.map((subnet) => subnet.subnetId),
+          subnetIds: vpc.isolatedSubnets.map((subnet) => subnet.subnetId),
         },
       ).ref,
     });
@@ -163,13 +206,13 @@ export class BoilerplateStack extends cdk.Stack {
         '.vscode',
         'docker',
         'infra', // exclude CDK infrastructure code
-        'node_modules', // exclude node_modules as we'll install them on the instance
         'src',
         'test',
         '.env*',
         '**/*.spec.ts',
         // add any other files/folders you want to exclude
       ],
+      followSymlinks: cdk.SymlinkFollowMode.NEVER,
     });
 
     // Create IAM role for EC2 instances
@@ -258,11 +301,6 @@ export class BoilerplateStack extends cdk.Stack {
           value: vpc.vpcId,
         },
         {
-          namespace: 'aws:ec2:vpc',
-          optionName: 'Subnets',
-          value: vpc.privateSubnets.map((subnet) => subnet.subnetId).join(','),
-        },
-        {
           namespace: 'aws:autoscaling:launchconfiguration',
           optionName: 'IamInstanceProfile',
           value: ebInstanceProfile.attrArn,
@@ -309,6 +347,11 @@ export class BoilerplateStack extends cdk.Stack {
         optionSettings: [
           ...commonOptionSettings,
           {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'Subnets',
+            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','),
+          },
+          {
             namespace: 'aws:autoscaling:launchconfiguration',
             optionName: 'SecurityGroups',
             value: apiSecurityGroup.securityGroupId,
@@ -329,6 +372,23 @@ export class BoilerplateStack extends cdk.Stack {
         solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
         optionSettings: [
           ...commonOptionSettings,
+          {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'Subnets',
+            value: vpc.privateSubnets
+              .map((subnet) => subnet.subnetId)
+              .join(','),
+          },
+          {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'AssociatePublicIpAddress',
+            value: 'false', // This disables public IP assignment
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'SecurityGroups',
+            value: workerSecurityGroup.securityGroupId,
+          },
           {
             namespace: 'aws:elasticbeanstalk:application:environment',
             optionName: 'MODE',
@@ -351,10 +411,20 @@ export class BoilerplateStack extends cdk.Stack {
       'Allow database access from API',
     );
 
-    new route53.CnameRecord(this, 'ApiCname', {
+    dbCluster.connections.allowFrom(
+      workerSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow database access from Worker',
+    );
+
+    new route53.ARecord(this, 'ApiAlias', {
       zone,
       recordName: subDomainNameApi,
-      domainName: apiEnvironment.attrEndpointUrl,
+      target: route53.RecordTarget.fromAlias(
+        new targets.ElasticBeanstalkEnvironmentEndpointTarget(
+          `${apiEnvironment.environmentName}.${this.region}.elasticbeanstalk.com`,
+        ),
+      ),
     });
 
     workerEnvironment.addDependency(
@@ -362,6 +432,80 @@ export class BoilerplateStack extends cdk.Stack {
       dbCluster.node.defaultChild as cdk.CfnResource,
     );
     workerEnvironment.addDependency(redis);
+
+    /**
+     * Bastion instance for debugging purposes
+     */
+    const bastionSecurityGroup = new ec2.SecurityGroup(
+      this,
+      'BastionSecurityGroup',
+      {
+        vpc,
+        description: 'Security group for Bastion Host',
+        allowAllOutbound: true,
+      },
+    );
+    // Allow SSH access
+    bastionSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      // ec2.Peer.ipv4('YOUR_IP_ADDRESS/32'),  // Replace with your IP address if want to restrict
+      ec2.Port.tcp(22),
+      'Allow SSH',
+    );
+    // Add this after VPC definition but before the bastion host
+    const keyPair = new ec2.CfnKeyPair(this, 'BastionKeyPair', {
+      keyName: `${projectName}-bastion-key`,
+    });
+
+    // Create bastion host
+    const bastion = new ec2.Instance(this, 'BastionHost', {
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC, // Place in public subnet
+      },
+      securityGroup: bastionSecurityGroup,
+      instanceType: ec2.InstanceType.of(
+        ec2.InstanceClass.T4G,
+        ec2.InstanceSize.NANO,
+      ), // Cheapest ARM instance
+      machineImage: new ec2.AmazonLinuxImage({
+        generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023,
+        cpuType: ec2.AmazonLinuxCpuType.ARM_64, // ARM for t4g.nano
+      }),
+      keyPair: ec2.KeyPair.fromKeyPairName(
+        this,
+        'BastionKeyPairReference',
+        keyPair.keyName,
+      ),
+    });
+
+    // Allow bastion to access Aurora
+    dbSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from Bastion',
+    );
+
+    // Allow bastion to access Redis
+    redisSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis access from Bastion',
+    );
+
+    /**
+     *  Outputs
+     */
+    // Bastion's public IP to connect
+    new cdk.CfnOutput(this, 'BastionPublicIP', {
+      value: bastion.instancePublicIp,
+    });
+
+    // Output the private key using Fn.getAtt
+    new cdk.CfnOutput(this, 'BastionSSHKeyOutput', {
+      value: cdk.Fn.getAtt(keyPair.logicalId, 'PrivateKey').toString(),
+      description: 'Private key for SSH access to bastion host',
+    });
   }
 
   private createApplicationVersion(

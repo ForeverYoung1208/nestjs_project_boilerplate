@@ -16,7 +16,7 @@
     "start:prod": "node dist/main",
     "start:worker:prod": "node dist/worker",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typeorm": "typeorm-ts-node-commonjs -d src/config/db/ormcli.config.ts",
+    "typeorm": "typeorm-ts-node-commonjs -d dist/config/db/ormcli.config.js",
     "migration:test:run": "NODE_ENV=test npm run typeorm migration:run",
     "migration:test:revert": "NODE_ENV=test npm run typeorm migration:revert",
     "migration:run": "npm run typeorm migration:run",
