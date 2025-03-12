@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { BoilerplateStack } from '../lib/infra-stack';
+import { AppStack } from '../lib/infra-stack';
+import { projectName } from '../config';
 
 const app = new cdk.App();
-new BoilerplateStack(app, 'BoilerplateStack', {
+new AppStack(app, `${projectName}Stack`, {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */

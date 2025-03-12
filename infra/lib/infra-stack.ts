@@ -22,7 +22,7 @@ import {
   nodeEnv,
 } from '../config';
 
-export class BoilerplateStack extends cdk.Stack {
+export class AppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -46,7 +46,7 @@ export class BoilerplateStack extends cdk.Stack {
 
     const mailPasswordSecret = new secretsmanager.Secret(
       this,
-      'MailPasswordSecret',
+      `${projectName}MailPasswordSecret`,
       {
         description: 'Mail password for the API service',
       },
@@ -63,7 +63,7 @@ export class BoilerplateStack extends cdk.Stack {
      */
 
     // VPC
-    const vpc = new ec2.Vpc(this, 'MyVPC', {
+    const vpc = new ec2.Vpc(this, `${projectName}VPC`, {
       ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
       maxAzs: 2, // Need 2 AZs for Aurora
       natGateways: 0,
@@ -87,20 +87,28 @@ export class BoilerplateStack extends cdk.Stack {
     });
 
     // ACM Certificate
-    const certificate = new certificatemanager.Certificate(this, 'ALBCert', {
-      domainName: subDomainNameApi,
-      validation: certificatemanager.CertificateValidation.fromDns(zone),
-    });
+    const certificate = new certificatemanager.Certificate(
+      this,
+      `${projectName}Certificate`,
+      {
+        domainName: subDomainNameApi,
+        validation: certificatemanager.CertificateValidation.fromDns(zone),
+      },
+    );
 
-    const apiSecurityGroup = new ec2.SecurityGroup(this, 'ApiSecurityGroup', {
-      vpc,
-      description: 'Serurity group for API',
-      allowAllOutbound: true,
-    });
+    const apiSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}ApiSecurityGroup`,
+      {
+        vpc,
+        description: 'Serurity group for API',
+        allowAllOutbound: true,
+      },
+    );
 
     const workerSecurityGroup = new ec2.SecurityGroup(
       this,
-      'WorkerSecurityGroup',
+      `${projectName}WorkerSecurityGroup`,
       {
         vpc,
         description: 'Security group for Worker',
@@ -134,7 +142,7 @@ export class BoilerplateStack extends cdk.Stack {
     // Aurora PostgreSQL Serverless
     const dbSecurityGroup = new ec2.SecurityGroup(
       this,
-      'DatabaseSecurityGroup',
+      `${projectName}DatabaseSecurityGroup`,
       {
         vpc,
         description: 'Security group for RDS',
@@ -147,7 +155,7 @@ export class BoilerplateStack extends cdk.Stack {
       ec2.Port.tcp(5432),
       'Allow PostgreSQL access from API',
     );
-    const dbCluster = new rds.DatabaseCluster(this, 'AuroraDB', {
+    const dbCluster = new rds.DatabaseCluster(this, `${projectName}AuroraDB`, {
       engine,
       vpc,
       vpcSubnets: {
@@ -157,13 +165,17 @@ export class BoilerplateStack extends cdk.Stack {
       writer: rds.ClusterInstance.serverlessV2('writer'),
       serverlessV2MinCapacity: 0.5, // Minimum ACU (0.5 is the minimum?)
       serverlessV2MaxCapacity: 1, // Maximum ACU
-      parameterGroup: new rds.ParameterGroup(this, 'ParameterGroup', {
-        engine,
-        parameters: {
-          // Terminate idle session for Aurora Serverless V2 auto-pause
-          idle_session_timeout: '60000',
+      parameterGroup: new rds.ParameterGroup(
+        this,
+        `${projectName}RdsParameterGroup`,
+        {
+          engine,
+          parameters: {
+            // Terminate idle session for Aurora Serverless V2 auto-pause
+            idle_session_timeout: '60000',
+          },
         },
-      }),
+      ),
 
       defaultDatabaseName: databaseName,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -202,10 +214,14 @@ export class BoilerplateStack extends cdk.Stack {
      */
 
     // ElastiCache Redis
-    const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSG', {
-      vpc,
-      allowAllOutbound: true,
-    });
+    const redisSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}RedisSG`,
+      {
+        vpc,
+        allowAllOutbound: true,
+      },
+    );
     // Add security group rule to allow Redis access
     redisSecurityGroup.addIngressRule(
       apiSecurityGroup,
@@ -213,20 +229,24 @@ export class BoilerplateStack extends cdk.Stack {
       'Allow Redis access from API and Worker',
     );
 
-    const redis = new elasticache.CfnCacheCluster(this, 'RedisCluster', {
-      cacheNodeType: 'cache.t3.micro',
-      engine: 'redis',
-      numCacheNodes: 1,
-      vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId],
-      cacheSubnetGroupName: new elasticache.CfnSubnetGroup(
-        this,
-        'RedisSubnetGroup',
-        {
-          description: 'Subnet group for Redis cluster',
-          subnetIds: vpc.isolatedSubnets.map((subnet) => subnet.subnetId),
-        },
-      ).ref,
-    });
+    const redis = new elasticache.CfnCacheCluster(
+      this,
+      `${projectName}RedisCluster`,
+      {
+        cacheNodeType: 'cache.t3.micro',
+        engine: 'redis',
+        numCacheNodes: 1,
+        vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId],
+        cacheSubnetGroupName: new elasticache.CfnSubnetGroup(
+          this,
+          `${projectName}RedisSubnetGroup`,
+          {
+            description: 'Subnet group for Redis cluster',
+            subnetIds: vpc.isolatedSubnets.map((subnet) => subnet.subnetId),
+          },
+        ).ref,
+      },
+    );
 
     /**
      *
@@ -240,7 +260,7 @@ export class BoilerplateStack extends cdk.Stack {
 
     // Create an S3 asset for application code
 
-    const appAsset = new s3assets.Asset(this, 'ApiAsset', {
+    const appAsset = new s3assets.Asset(this, `${projectName}ApiAsset`, {
       path: '../', // Point to parent directory
       exclude: [
         '.git',
@@ -279,7 +299,7 @@ export class BoilerplateStack extends cdk.Stack {
     });
 
     // Create IAM role for EC2 instances
-    const ebInstanceRole = new iam.Role(this, 'EBInstanceRole', {
+    const ebInstanceRole = new iam.Role(this, `${projectName}EBInstanceRole`, {
       assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName(
@@ -294,23 +314,27 @@ export class BoilerplateStack extends cdk.Stack {
     // Create instance profile
     const ebInstanceProfile = new iam.CfnInstanceProfile(
       this,
-      'EBInstanceProfile',
+      `${projectName}EBInstanceProfile`,
       {
         roles: [ebInstanceRole.roleName],
       },
     );
 
     // Create Elastic Beanstalk application
-    const app = new elasticbeanstalk.CfnApplication(this, 'Application', {
-      applicationName: `${projectName}-application`,
-    });
+    const app = new elasticbeanstalk.CfnApplication(
+      this,
+      `${projectName}Application`,
+      {
+        applicationName: `${projectName}-application`,
+      },
+    );
     if (!app.applicationName) {
       throw new Error('app.applicationName is undefined');
     }
 
     const versionLabel = this.createApplicationVersion(
       app,
-      'AppVersion',
+      `${projectName}AppVersion`,
       appAsset,
     );
 
@@ -428,7 +452,7 @@ export class BoilerplateStack extends cdk.Stack {
     // Create Worker environment
     const workerEnvironment = new elasticbeanstalk.CfnEnvironment(
       this,
-      'WorkerEnvironment',
+      `${projectName}WorkerEnvironment`,
       {
         environmentName: `${projectName}-Worker-Environment`,
         applicationName: app.applicationName,
@@ -479,7 +503,7 @@ export class BoilerplateStack extends cdk.Stack {
      */
     const bastionSecurityGroup = new ec2.SecurityGroup(
       this,
-      'BastionSecurityGroup',
+      `${projectName}BastionSecurityGroup`,
       {
         vpc,
         description: 'Security group for Bastion Host',
@@ -494,12 +518,12 @@ export class BoilerplateStack extends cdk.Stack {
       'Allow SSH',
     );
     // Add this after VPC definition but before the bastion host
-    const keyPair = new ec2.CfnKeyPair(this, 'BastionKeyPair', {
+    const keyPair = new ec2.CfnKeyPair(this, `${projectName}BastionKeyPair`, {
       keyName: `${projectName}-bastion-key`,
     });
 
     // Create bastion host
-    const bastion = new ec2.Instance(this, 'BastionHost', {
+    const bastion = new ec2.Instance(this, `${projectName}BastionHost`, {
       vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC, // Place in public subnet
@@ -508,7 +532,7 @@ export class BoilerplateStack extends cdk.Stack {
       instanceType: ec2.InstanceType.of(
         ec2.InstanceClass.T4G,
         ec2.InstanceSize.NANO,
-      ), // Cheapest ARM instance
+      ),
       machineImage: new ec2.AmazonLinuxImage({
         generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023,
         cpuType: ec2.AmazonLinuxCpuType.ARM_64, // ARM for t4g.nano
@@ -544,7 +568,7 @@ export class BoilerplateStack extends cdk.Stack {
      *
      */
 
-    new route53.ARecord(this, 'ApiAlias', {
+    new route53.ARecord(this, `${projectName}ApiAlias`, {
       zone,
       recordName: subDomainNameApi,
       target: route53.RecordTarget.fromAlias(
