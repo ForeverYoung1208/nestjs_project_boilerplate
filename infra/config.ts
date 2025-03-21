@@ -1,5 +1,5 @@
 // project name (any) - will be used as part of naming for some resources like docker image, database, etc.
-export const projectName = 'boilerplate';
+export const projectName = 'boilerplate6';
 
 // define your registered domain (you must have one at Route53)
 export const domainName = 'for-test.click';

@@ -8,7 +8,6 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as s3assets from 'aws-cdk-lib/aws-s3-assets';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import { Construct } from 'constructs';
 import {
   databaseName,
@@ -125,6 +124,14 @@ export class AppStack extends cdk.Stack {
       ec2.Port.tcp(443),
       'Allow https',
     );
+
+    // todo: remove after debugging
+    apiSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(22),
+      'Allow ssh',
+    );
+    // ^^^
 
     /**
      *
@@ -284,16 +291,25 @@ export class AppStack extends cdk.Stack {
           '-c',
           [
             'set -ex', // Enable debugging output
-            'cp /asset-input/package*.json /asset-output/',
+            // Copy only files (not directories) from input to output
+            'find /asset-input -maxdepth 1 -type f -exec cp {} /asset-output/ \\;',
             'cd /asset-output',
             'npm i -g @nestjs/cli',
             'npm ci --production',
             'cp -r /asset-input/src /asset-output/',
-            'cp -r /asset-input/tsconfig*.json /asset-output/',
             'npm run build',
-            'rm -rf src/ tsconfig*.json', // Remove source files after build
-            'rm -rf node_modules/@types', // Remove type definitions to reduce size
           ].join(' && '),
+
+          // [
+          //   'set -ex', // Enable debugging output
+          //   'npm i -g @nestjs/cli',
+          //   'npm ci --production',
+          //   'cp -r /asset-input/src /asset-output/',
+          //   'cp -r /asset-input/tsconfig*.json /asset-output/',
+          //   'npm run build',
+          //   'rm -rf src/ tsconfig*.json', // Remove source files after build
+          //   'rm -rf node_modules/@types', // Remove type definitions to reduce size
+          // ].join(' && '),
         ],
       },
     });
@@ -405,7 +421,7 @@ export class AppStack extends cdk.Stack {
         {
           namespace: 'aws:ec2:instances',
           optionName: 'InstanceTypes',
-          value: 't4g.micro',
+          value: 't2.nano',
         },
         {
           namespace: 'aws:elasticbeanstalk:environment',
@@ -424,9 +440,13 @@ export class AppStack extends cdk.Stack {
         },
       ];
 
+    const keyPairApi = new ec2.CfnKeyPair(this, `${projectName}ApiKeyPair`, {
+      keyName: `${projectName}-api-key`,
+    });
+
     const apiEnvironment = new elasticbeanstalk.CfnEnvironment(
       this,
-      'ApiEnvironment',
+      `${projectName}ApiEnvironment`,
       {
         environmentName: `${projectName}-Api-Environment`,
         applicationName: app.applicationName,
@@ -443,6 +463,11 @@ export class AppStack extends cdk.Stack {
             optionName: 'SecurityGroups',
             value: apiSecurityGroup.securityGroupId,
           },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'EC2KeyName',
+            value: keyPairApi.keyName,
+          },
           ...commonEnvVars,
         ],
         versionLabel,
@@ -457,25 +482,22 @@ export class AppStack extends cdk.Stack {
         environmentName: `${projectName}-Worker-Environment`,
         applicationName: app.applicationName,
         solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
-        tier: {
-          // Add this tier configuration
-          name: 'Worker',
-          type: 'SQS/HTTP',
-        },
+        // tier: {
+        //   name: 'Worker',
+        //   type: 'SQS/HTTP',
+        // },
         optionSettings: [
           ...commonOptionSettings,
           {
             namespace: 'aws:ec2:vpc',
             optionName: 'Subnets',
-            value: vpc.isolatedSubnets
-              .map((subnet) => subnet.subnetId)
-              .join(','),
+            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // need internet access to send emails to some smtp service
           },
-          {
-            namespace: 'aws:ec2:vpc',
-            optionName: 'AssociatePublicIpAddress',
-            value: 'false', // This disables public IP assignment
-          },
+          // {
+          //   namespace: 'aws:ec2:vpc',
+          //   optionName: 'AssociatePublicIpAddress',
+          //   value: 'false', // This disables public IP assignment
+          // },
           {
             namespace: 'aws:autoscaling:launchconfiguration',
             optionName: 'SecurityGroups',
@@ -530,12 +552,11 @@ export class AppStack extends cdk.Stack {
       },
       securityGroup: bastionSecurityGroup,
       instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.T4G,
+        ec2.InstanceClass.T2,
         ec2.InstanceSize.NANO,
       ),
       machineImage: new ec2.AmazonLinuxImage({
         generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023,
-        cpuType: ec2.AmazonLinuxCpuType.ARM_64, // ARM for t4g.nano
       }),
       keyPair: ec2.KeyPair.fromKeyPairName(
         this,
@@ -558,6 +579,20 @@ export class AppStack extends cdk.Stack {
       'Allow Redis access from Bastion',
     );
 
+    // Allow bastion to access Api
+    apiSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(22),
+      'Allow Redis access from Bastion',
+    );
+
+    // Allow bastion to access Worker
+    workerSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(22),
+      'Allow Redis access from Bastion',
+    );
+
     /**
      *
      *
@@ -568,14 +603,18 @@ export class AppStack extends cdk.Stack {
      *
      */
 
-    new route53.ARecord(this, `${projectName}ApiAlias`, {
+    // new route53.ARecord(this, `${projectName}ApiAlias`, {
+    //   zone,
+    //   recordName: subDomainNameApi,
+    //   target: route53.RecordTarget.fromIpAddresses(
+    //     apiEnvironment.attrEndpointUrl,
+    //   ),
+    // });
+
+    new route53.CnameRecord(this, `${projectName}ApiAlias`, {
       zone,
       recordName: subDomainNameApi,
-      target: route53.RecordTarget.fromAlias(
-        new targets.ElasticBeanstalkEnvironmentEndpointTarget(
-          `${apiEnvironment.environmentName}.${this.region}.elasticbeanstalk.com`,
-        ),
-      ),
+      domainName: apiEnvironment.attrEndpointUrl,
     });
 
     // Add explicit dependencies
@@ -613,6 +652,11 @@ export class AppStack extends cdk.Stack {
     // Output just the key name instead of trying to get the private key
     new cdk.CfnOutput(this, 'BastionSSHKeyOutput', {
       value: keyPair.keyName,
+      description:
+        'Key pair name for SSH access to bastion host. Get the private key from SSM Parameter Store.',
+    });
+    new cdk.CfnOutput(this, 'ApiSSHKeyOutput', {
+      value: keyPairApi.keyName,
       description:
         'Key pair name for SSH access to bastion host. Get the private key from SSM Parameter Store.',
     });
