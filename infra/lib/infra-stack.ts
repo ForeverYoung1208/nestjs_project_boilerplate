@@ -13,7 +13,7 @@ import {
   databaseName,
   domainName,
   projectName,
-  subDomainNameApi,
+  fullSubDomainNameApi,
   userDeploerName,
   secretName,
   databaseUsername,
@@ -90,7 +90,7 @@ export class AppStack extends cdk.Stack {
       this,
       `${projectName}Certificate`,
       {
-        domainName: subDomainNameApi,
+        domainName: fullSubDomainNameApi,
         validation: certificatemanager.CertificateValidation.fromDns(zone),
       },
     );
@@ -114,15 +114,26 @@ export class AppStack extends cdk.Stack {
       },
     );
 
-    apiSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(80),
-      'Allow http',
+    const albSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}AlbSecurityGroup`,
+      {
+        vpc,
+        description: 'Security group for API ALB',
+        allowAllOutbound: true,
+      },
     );
+
     apiSecurityGroup.addIngressRule(
+      ec2.Peer.securityGroupId(albSecurityGroup.securityGroupId),
+      ec2.Port.tcp(3000),
+      'Allow traffic from ALB',
+    );
+
+    albSecurityGroup.addIngressRule(
       ec2.Peer.anyIpv4(),
       ec2.Port.tcp(443),
-      'Allow https',
+      'Allow HTTPS',
     );
 
     // todo: remove after debugging
@@ -162,6 +173,7 @@ export class AppStack extends cdk.Stack {
       ec2.Port.tcp(5432),
       'Allow PostgreSQL access from API',
     );
+
     const dbCluster = new rds.DatabaseCluster(this, `${projectName}AuroraDB`, {
       engine,
       vpc,
@@ -299,17 +311,6 @@ export class AppStack extends cdk.Stack {
             'cp -r /asset-input/src /asset-output/',
             'npm run build',
           ].join(' && '),
-
-          // [
-          //   'set -ex', // Enable debugging output
-          //   'npm i -g @nestjs/cli',
-          //   'npm ci --production',
-          //   'cp -r /asset-input/src /asset-output/',
-          //   'cp -r /asset-input/tsconfig*.json /asset-output/',
-          //   'npm run build',
-          //   'rm -rf src/ tsconfig*.json', // Remove source files after build
-          //   'rm -rf node_modules/@types', // Remove type definitions to reduce size
-          // ].join(' && '),
         ],
       },
     });
@@ -360,7 +361,7 @@ export class AppStack extends cdk.Stack {
       ...this.createEnvironmentVariables({
         NODE_ENV: nodeEnv,
         PORT: '3000',
-        SITE_ORIGIN: `https://${subDomainNameApi}`,
+        SITE_ORIGIN: `https://${fullSubDomainNameApi}`,
         DB_HOST: dbCluster.clusterEndpoint.hostname,
         DB_PORT: dbCluster.clusterEndpoint.port.toString(),
         DB_DATABASE: databaseName,
@@ -396,6 +397,10 @@ export class AppStack extends cdk.Stack {
       },
     ];
 
+    const keyPairApi = new ec2.CfnKeyPair(this, `${projectName}ApiKeyPair`, {
+      keyName: `${projectName}-api-key`,
+    });
+
     const commonOptionSettings: elasticbeanstalk.CfnEnvironment.OptionSettingProperty[] =
       [
         {
@@ -409,24 +414,9 @@ export class AppStack extends cdk.Stack {
           value: ebInstanceProfile.attrArn,
         },
         {
-          namespace: 'aws:autoscaling:asg',
-          optionName: 'MinSize',
-          value: '1',
-        },
-        {
-          namespace: 'aws:autoscaling:asg',
-          optionName: 'MaxSize',
-          value: '1',
-        },
-        {
           namespace: 'aws:ec2:instances',
           optionName: 'InstanceTypes',
           value: 't2.nano',
-        },
-        {
-          namespace: 'aws:elasticbeanstalk:environment',
-          optionName: 'EnvironmentType',
-          value: 'SingleInstance', // This ensures single instance deployment
         },
         {
           namespace: 'aws:elasticbeanstalk:cloudwatch:logs',
@@ -438,11 +428,12 @@ export class AppStack extends cdk.Stack {
           optionName: 'HealthStreamingEnabled',
           value: 'true',
         },
+        {
+          namespace: 'aws:autoscaling:launchconfiguration',
+          optionName: 'EC2KeyName',
+          value: keyPairApi.keyName,
+        },
       ];
-
-    const keyPairApi = new ec2.CfnKeyPair(this, `${projectName}ApiKeyPair`, {
-      keyName: `${projectName}-api-key`,
-    });
 
     const apiEnvironment = new elasticbeanstalk.CfnEnvironment(
       this,
@@ -459,14 +450,80 @@ export class AppStack extends cdk.Stack {
             value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','),
           },
           {
+            namespace: 'aws:elbv2:loadbalancer',
+            optionName: 'SecurityGroups',
+            value: albSecurityGroup.securityGroupId,
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment',
+            optionName: 'EnvironmentType',
+            value: 'LoadBalanced',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MinSize',
+            value: '1',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MaxSize',
+            value: '2', // Increased to allow for replacement during updates
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment',
+            optionName: 'LoadBalancerType',
+            value: 'application',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'Port',
+            value: '3000',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'Protocol',
+            value: 'HTTP',
+          },
+          {
+            namespace: 'aws:elbv2:listener:443',
+            optionName: 'Protocol',
+            value: 'HTTPS',
+          },
+          // Redirect HTTP to HTTPS
+          {
+            namespace: 'aws:elbv2:listener:default',
+            optionName: 'ListenerEnabled',
+            value: 'false',
+          },
+          {
+            namespace: 'aws:elbv2:listener:443',
+            optionName: 'SSLCertificateArns',
+            value: certificate.certificateArn,
+          },
+          {
             namespace: 'aws:autoscaling:launchconfiguration',
             optionName: 'SecurityGroups',
             value: apiSecurityGroup.securityGroupId,
           },
           {
-            namespace: 'aws:autoscaling:launchconfiguration',
-            optionName: 'EC2KeyName',
-            value: keyPairApi.keyName,
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthCheckPath',
+            value: '/',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthCheckInterval',
+            value: '15',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthyThresholdCount',
+            value: '2',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'UnhealthyThresholdCount',
+            value: '10',
           },
           ...commonEnvVars,
         ],
@@ -477,27 +534,21 @@ export class AppStack extends cdk.Stack {
     // Create Worker environment
     const workerEnvironment = new elasticbeanstalk.CfnEnvironment(
       this,
-      `${projectName}WorkerEnvironment`,
+      `${projectName}WorkerEnvironmentTmp`,
       {
-        environmentName: `${projectName}-Worker-Environment`,
+        environmentName: `${projectName}-Worker-EnvironmentTmp`,
         applicationName: app.applicationName,
         solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
-        // tier: {
-        //   name: 'Worker',
-        //   type: 'SQS/HTTP',
-        // },
         optionSettings: [
           ...commonOptionSettings,
           {
             namespace: 'aws:ec2:vpc',
             optionName: 'Subnets',
-            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // need internet access to send emails to some smtp service
+            // value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // maybe need internet access to send emails to some smtp service
+            value: vpc.isolatedSubnets
+              .map((subnet) => subnet.subnetId)
+              .join(','), //  but lets try to use ses, without external access for worker
           },
-          // {
-          //   namespace: 'aws:ec2:vpc',
-          //   optionName: 'AssociatePublicIpAddress',
-          //   value: 'false', // This disables public IP assignment
-          // },
           {
             namespace: 'aws:autoscaling:launchconfiguration',
             optionName: 'SecurityGroups',
@@ -507,6 +558,41 @@ export class AppStack extends cdk.Stack {
             namespace: 'aws:elasticbeanstalk:application:environment',
             optionName: 'MODE',
             value: 'WORKER',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MinSize',
+            value: '1',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MaxSize',
+            value: '1',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment',
+            optionName: 'EnvironmentType',
+            value: 'SingleInstance', // This ensures single instance deployment
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'DisableIMDSv1',
+            value: 'true',
+          },
+          {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'AssociatePublicIpAddress',
+            value: 'false',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:healthreporting:system',
+            optionName: 'SystemType',
+            value: 'enhanced', // Enable enhanced health reporting
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'MonitoringInterval',
+            value: '5 minutes', // Enable detailed monitoring
           },
           ...commonEnvVars,
         ],
@@ -583,14 +669,14 @@ export class AppStack extends cdk.Stack {
     apiSecurityGroup.addIngressRule(
       bastionSecurityGroup,
       ec2.Port.tcp(22),
-      'Allow Redis access from Bastion',
+      'Allow SSH access from Bastion to API',
     );
 
     // Allow bastion to access Worker
     workerSecurityGroup.addIngressRule(
       bastionSecurityGroup,
       ec2.Port.tcp(22),
-      'Allow Redis access from Bastion',
+      'Allow bastion to access Worker',
     );
 
     /**
@@ -603,17 +689,9 @@ export class AppStack extends cdk.Stack {
      *
      */
 
-    // new route53.ARecord(this, `${projectName}ApiAlias`, {
-    //   zone,
-    //   recordName: subDomainNameApi,
-    //   target: route53.RecordTarget.fromIpAddresses(
-    //     apiEnvironment.attrEndpointUrl,
-    //   ),
-    // });
-
     new route53.CnameRecord(this, `${projectName}ApiAlias`, {
       zone,
-      recordName: subDomainNameApi,
+      recordName: fullSubDomainNameApi,
       domainName: apiEnvironment.attrEndpointUrl,
     });
 
@@ -665,6 +743,16 @@ export class AppStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'SSHKeyCommand', {
       value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.getAtt('KeyPairId')} --with-decryption --query Parameter.Value --output text`,
       description: 'Command to get the private key from SSM Parameter Store',
+    });
+
+    new cdk.CfnOutput(this, 'ApiInstanceAddress', {
+      value: apiEnvironment.attrEndpointUrl,
+      description: 'IP(case single instance)/URL(case ALB) of the API instance',
+    });
+    new cdk.CfnOutput(this, 'WorkerInstanceAddress', {
+      value: workerEnvironment.attrEndpointUrl,
+      description:
+        'IP(case single instance)/URL(case ALB) of the WORKER instance',
     });
   }
 

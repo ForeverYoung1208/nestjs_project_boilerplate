@@ -1,11 +1,12 @@
 // project name (any) - will be used as part of naming for some resources like docker image, database, etc.
-export const projectName = 'boilerplate6';
+export const projectName = 'boilerplate';
 
 // define your registered domain (you must have one at Route53)
 export const domainName = 'for-test.click';
 
 // subdomain for api (will be created)
-export const subDomainNameApi = `api.${projectName}.${domainName}`;
+export const subDomainNameApi = `api.${projectName}`;
+export const fullSubDomainNameApi = `${subDomainNameApi}.${domainName}`;
 
 // user for deployment using CI/CD (will be created)
 export const userDeploerName = `${projectName}-deployer`;

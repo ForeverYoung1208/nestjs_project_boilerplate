@@ -47,11 +47,11 @@ services:
       - ${COMPOSE_POSTGRES_PORT}:5432
       
   
-  postgres_test:
+  db_test:
     extends:
       file: base-docker-compose.yml
       service: db
-    container_name: ${COMPOSE_PROJECT_NAME}_postgres_test      
+    container_name: ${COMPOSE_PROJECT_NAME}_db_test      
     volumes:
       - ./postgres/data_tests:/var/lib/postgresql/data
     environment:
