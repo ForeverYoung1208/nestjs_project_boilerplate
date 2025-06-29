@@ -544,10 +544,7 @@ export class AppStack extends cdk.Stack {
           {
             namespace: 'aws:ec2:vpc',
             optionName: 'Subnets',
-            // value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // maybe need internet access to send emails to some smtp service
-            value: vpc.isolatedSubnets
-              .map((subnet) => subnet.subnetId)
-              .join(','), //  but lets try to use ses, without external access for worker
+            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // Use public subnets for internet access. Interned access is needded for elastic beanstalk to finish deployment.
           },
           {
             namespace: 'aws:autoscaling:launchconfiguration',
@@ -582,7 +579,7 @@ export class AppStack extends cdk.Stack {
           {
             namespace: 'aws:ec2:vpc',
             optionName: 'AssociatePublicIpAddress',
-            value: 'false',
+            value: 'true',
           },
           {
             namespace: 'aws:elasticbeanstalk:healthreporting:system',
@@ -787,3 +784,46 @@ export class AppStack extends cdk.Stack {
     }));
   }
 }
+
+// Yes, your bastion setup is correctly configured. Here's how to use it:
+
+// 1. Get the SSH key and bastion IP
+// After deployment, run the commands from your CDK outputs:
+
+// # Get bastion IP (from CDK output)
+// BASTION_IP=$(aws cloudformation describe-stacks --stack-name YourStackName --query 'Stacks[0].Outputs[?OutputKey==`BastionPublicIP`].OutputValue' --output text)
+
+// # Get SSH private key
+// aws ssm get-parameter --name /ec2/keypair/KEY_PAIR_ID --with-decryption --query Parameter.Value --output text > bastion-key.pem
+// chmod 400 bastion-key.pem
+
+// Copy
+// bash
+// 2. Connect to bastion
+// ssh -i bastion-key.pem ec2-user@$BASTION_IP
+
+// Copy
+// bash
+// 3. Access Aurora from bastion
+// # Install PostgreSQL client on bastion
+// sudo dnf install postgresql15 -y
+
+// # Connect to Aurora (get endpoint from CDK outputs)
+// psql -h your-aurora-endpoint.cluster-xxx.eu-central-1.rds.amazonaws.com -U your-username -d your-database
+
+// Copy
+// 4. Access Redis from bastion
+// # Install Redis client
+// sudo dnf install redis6 -y
+
+// # Connect to Redis (get endpoint from CDK outputs)
+// redis-cli -h your-redis-endpoint.cache.amazonaws.com -p 6379
+
+// Copy
+// bash
+// 5. SSH to API/Worker instances via bastion
+// # From bastion, SSH to API/Worker instances
+// ssh -i api-key.pem ec2-user@PRIVATE_IP_OF_API_OR_WORKER
+
+// Copy
+// Your security group rules are correct - bastion can access Aurora (5432), Redis (6379), and SSH to API/Worker instances (22).

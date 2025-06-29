@@ -8,4 +8,6 @@
     "runtimeExecutable": "./.vscode/run-jest-debug-in-docker.sh",
   },
   "jestrunner.preserveEditorFocus": true,
+  "amazonQ.showCodeWithReferences": false,
+  "amazonQ.importRecommendationForInlineCodeSuggestions": false,
 }

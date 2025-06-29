@@ -9,10 +9,7 @@ import { ValidationException } from '../../exceptions/validation-exception';
 
 @Injectable()
 @Catch(UnprocessableEntityException, ValidationException)
-export class ValidationFilter
-  extends BaseExceptionFilter
-  implements ExceptionFilter
-{
+export class ValidationFilter extends BaseExceptionFilter {
   processException(
     exception: UnprocessableEntityException | ValidationException,
   ): IExceptionProcessResult {
