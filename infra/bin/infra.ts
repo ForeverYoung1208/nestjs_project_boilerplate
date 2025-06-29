@@ -1,8 +1,19 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
+import { execSync } from 'child_process';
 import { AppStack } from '../lib/infra-stack';
 import { projectName } from '../config';
+
+// Build the application before deployment
+console.log('Building application...');
+try {
+  execSync('npm run build', { cwd: '../', stdio: 'inherit' });
+  console.log('✅ Build completed successfully!');
+} catch (error) {
+  console.error('❌ Build failed!');
+  process.exit(1);
+}
 
 const app = new cdk.App();
 new AppStack(app, `${projectName}Stack`, {

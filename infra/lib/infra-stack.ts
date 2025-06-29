@@ -136,7 +136,7 @@ export class AppStack extends cdk.Stack {
       'Allow HTTPS',
     );
 
-    // todo: remove after debugging
+    // todo: remove after debugging - leave connection possibility onlly through bastion
     apiSecurityGroup.addIngressRule(
       ec2.Peer.anyIpv4(),
       ec2.Port.tcp(22),
@@ -291,28 +291,9 @@ export class AppStack extends cdk.Stack {
         'test',
         '.env*',
         '**/*.spec.ts',
+        'node_modules',
         // add any other files/folders you want to exclude
       ],
-      bundling: {
-        image: cdk.DockerImage.fromRegistry(
-          'public.ecr.aws/docker/library/node:22',
-        ),
-        user: 'root',
-        command: [
-          'bash',
-          '-c',
-          [
-            'set -ex', // Enable debugging output
-            // Copy only files (not directories) from input to output
-            'find /asset-input -maxdepth 1 -type f -exec cp {} /asset-output/ \\;',
-            'cd /asset-output',
-            'npm i -g @nestjs/cli',
-            'npm ci --production',
-            'cp -r /asset-input/src /asset-output/',
-            'npm run build',
-          ].join(' && '),
-        ],
-      },
     });
 
     // Create IAM role for EC2 instances
@@ -534,9 +515,9 @@ export class AppStack extends cdk.Stack {
     // Create Worker environment
     const workerEnvironment = new elasticbeanstalk.CfnEnvironment(
       this,
-      `${projectName}WorkerEnvironmentTmp`,
+      `${projectName}WorkerEnvironment`,
       {
-        environmentName: `${projectName}-Worker-EnvironmentTmp`,
+        environmentName: `${projectName}-Worker-Environment`,
         applicationName: app.applicationName,
         solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
         optionSettings: [
@@ -751,6 +732,24 @@ export class AppStack extends cdk.Stack {
       description:
         'IP(case single instance)/URL(case ALB) of the WORKER instance',
     });
+
+    // Outputs for connecting via Bastion
+    new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
+      value: dbCluster.clusterEndpoint.hostname,
+      description: 'Aurora RDS cluster endpoint hostname',
+    });
+    new cdk.CfnOutput(this, 'AuroraClusterPort', {
+      value: dbCluster.clusterEndpoint.port.toString(),
+      description: 'Aurora RDS cluster port',
+    });
+    new cdk.CfnOutput(this, 'RedisEndpoint', {
+      value: redis.attrRedisEndpointAddress,
+      description: 'Redis cluster endpoint address',
+    });
+    new cdk.CfnOutput(this, 'RedisPort', {
+      value: redis.attrRedisEndpointPort,
+      description: 'Redis cluster port',
+    });
   }
 
   private createApplicationVersion(
@@ -784,46 +783,3 @@ export class AppStack extends cdk.Stack {
     }));
   }
 }
-
-// Yes, your bastion setup is correctly configured. Here's how to use it:
-
-// 1. Get the SSH key and bastion IP
-// After deployment, run the commands from your CDK outputs:
-
-// # Get bastion IP (from CDK output)
-// BASTION_IP=$(aws cloudformation describe-stacks --stack-name YourStackName --query 'Stacks[0].Outputs[?OutputKey==`BastionPublicIP`].OutputValue' --output text)
-
-// # Get SSH private key
-// aws ssm get-parameter --name /ec2/keypair/KEY_PAIR_ID --with-decryption --query Parameter.Value --output text > bastion-key.pem
-// chmod 400 bastion-key.pem
-
-// Copy
-// bash
-// 2. Connect to bastion
-// ssh -i bastion-key.pem ec2-user@$BASTION_IP
-
-// Copy
-// bash
-// 3. Access Aurora from bastion
-// # Install PostgreSQL client on bastion
-// sudo dnf install postgresql15 -y
-
-// # Connect to Aurora (get endpoint from CDK outputs)
-// psql -h your-aurora-endpoint.cluster-xxx.eu-central-1.rds.amazonaws.com -U your-username -d your-database
-
-// Copy
-// 4. Access Redis from bastion
-// # Install Redis client
-// sudo dnf install redis6 -y
-
-// # Connect to Redis (get endpoint from CDK outputs)
-// redis-cli -h your-redis-endpoint.cache.amazonaws.com -p 6379
-
-// Copy
-// bash
-// 5. SSH to API/Worker instances via bastion
-// # From bastion, SSH to API/Worker instances
-// ssh -i api-key.pem ec2-user@PRIVATE_IP_OF_API_OR_WORKER
-
-// Copy
-// Your security group rules are correct - bastion can access Aurora (5432), Redis (6379), and SSH to API/Worker instances (22).
