@@ -32,7 +32,8 @@ Get bastion IP (from CDK output)
 BASTION_IP=$(aws cloudformation describe-stacks --stack-name YourStackName --query 'Stacks[0].Outputs[?OutputKey==`BastionPublicIP`].OutputValue' --output text)
 ```
 
-Get SSH private key
+Get SSH private key 
+example: (composed command with KEY_PAIR_ID you can find in outpusts  as SSHKeyCommand)
 ```
 aws ssm get-parameter --name /ec2/keypair/KEY_PAIR_ID --with-decryption --query Parameter.Value --output text > bastion-key.pem
 chmod 400 bastion-key.pem
@@ -67,7 +68,7 @@ ssh -i bastion-key.pem ec2-user@18.153.68.156
 ```
 
 
-fetch api key to connect from bastion to api
+fetch key to connect to api
 ```
 aws ssm get-parameter --name "/ec2/keypair/$(aws ec2 describe-key-pairs --key-names boilerplate-api-key --query 'KeyPairs[0].KeyPairId' --output text)" --with-decryption --query Parameter.Value --output text > boilerplate-api-key.pem
 chmod 400 boilerplate-api-key.pem
@@ -77,4 +78,29 @@ chmod 400 boilerplate-api-key.pem
 login from bastion to api
 ```
 ssh -i boilerplate-api-key.pem ec2-user@ec2-3-69-31-83.eu-central-1.compute.amazonaws.com
+```
+
+## postgres
+```install client
+sudo dnf install postgresql15
+```
+
+```get credentials
+aws secretsmanager get-secret-value --secret-id boilerplate-db-credentials --query SecretString --output text | jq '.'
+```
+
+```connect
+psql -h boilerplatestack-boilerplateauroradbc4ff7a80-zolkr8gylbpk.cluster-cniqg8kg8g2s.eu-central-1.rds.amazonaws.com -U your_username -d your_database_name
+```
+
+```list databases
+\list
+```
+
+```change database
+\c boilerplate
+```
+
+```list tables
+\dt
 ```

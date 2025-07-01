@@ -48,6 +48,9 @@ export class AppStack extends cdk.Stack {
       `${projectName}MailPasswordSecret`,
       {
         description: 'Mail password for the API service',
+        secretStringValue: cdk.SecretValue.unsafePlainText(
+          'set-here-your-email-server-password-after-deploying',
+        ),
       },
     );
 
@@ -111,6 +114,7 @@ export class AppStack extends cdk.Stack {
       {
         vpc,
         description: 'Security group for Worker',
+        allowAllOutbound: true,
       },
     );
 
@@ -245,7 +249,13 @@ export class AppStack extends cdk.Stack {
     redisSecurityGroup.addIngressRule(
       apiSecurityGroup,
       ec2.Port.tcp(6379),
-      'Allow Redis access from API and Worker',
+      'Allow Redis access from API',
+    );
+    
+    redisSecurityGroup.addIngressRule(
+      workerSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis access from Worker',
     );
 
     const redis = new elasticache.CfnCacheCluster(
@@ -309,6 +319,21 @@ export class AppStack extends cdk.Stack {
       ],
     });
 
+    // Add Secrets Manager permissions
+    ebInstanceRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'secretsmanager:GetSecretValue',
+          'secretsmanager:DescribeSecret',
+        ],
+        resources: [
+          dbCluster.secret!.secretArn,
+          mailPasswordSecret.secretArn,
+        ],
+      }),
+    );
+
     // Create instance profile
     const ebInstanceProfile = new iam.CfnInstanceProfile(
       this,
@@ -357,7 +382,7 @@ export class AppStack extends cdk.Stack {
         MAIL_TLS: 'true',
         MAIL_USERNAME: 'siafin2010@gmail.com',
         MAIL_FROM_EMAIL: 'ihor.shcherbyna@clockwise.software',
-        COMPANY_NAME: companyName,
+        COMPANY_NAME: `"${companyName}"`,
         // todo: read stuff from .env
       }),
 
@@ -727,6 +752,13 @@ export class AppStack extends cdk.Stack {
       value: apiEnvironment.attrEndpointUrl,
       description: 'IP(case single instance)/URL(case ALB) of the API instance',
     });
+
+    new cdk.CfnOutput(this, 'ApiInstancePublicDNS', {
+      value:
+        'aws ec2 describe-instances --filters "Name=tag:elasticbeanstalk:environment-name,Values=boilerplate-Api-Environment" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].PublicDnsName" --output text',
+      description: 'Command to get API instance public DNS for SSH access',
+    });
+
     new cdk.CfnOutput(this, 'WorkerInstanceAddress', {
       value: workerEnvironment.attrEndpointUrl,
       description:
