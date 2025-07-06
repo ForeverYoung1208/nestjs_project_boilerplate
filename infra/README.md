@@ -29,19 +29,21 @@ OR After deployment, run the commands from your CDK outputs:
 
 Get bastion IP (from CDK output)
 ```
-BASTION_IP=$(aws cloudformation describe-stacks --stack-name YourStackName --query 'Stacks[0].Outputs[?OutputKey==`BastionPublicIP`].OutputValue' --output text)
+$ aws cloudformation describe-stacks --stack-name boilerplateStack --query 'Stacks[0].Outputs[?OutputKey==`BastionPublicIP`].OutputValue' --output text
 ```
 
 Get SSH private key 
 example: (composed command with KEY_PAIR_ID you can find in outpusts  as SSHKeyCommand)
 ```
-aws ssm get-parameter --name /ec2/keypair/KEY_PAIR_ID --with-decryption --query Parameter.Value --output text > bastion-key.pem
+aws ssm get-parameter --name "/ec2/keypair/$(aws ec2 describe-key-pairs --key-names boilerplate-bastion-key --query 'KeyPairs[0].KeyPairId' --output text)" --with-decryption --query Parameter.Value --output text > boilerplate-bastion-key.pem
 chmod 400 bastion-key.pem
 ```
 
+
+
 2. Setup ssh tunnel port from localhost:5432  to AuroraClusterEndpoint through bastion 18.153.68.156 (use your AuroraClusterEndpoint and your IP )
 ```
-ssh -i bastion-key.pem -L 5432:boilerplatestack-boilerplateauroradbc4ff7a80-zolkr8gylbpk.cluster-cniqg8kg8g2s.eu-central-1.rds.amazonaws.com:5432 ec2-user@18.153.68.156 -N
+ssh -i boilerplate-bastion-key.pem -L 5432:boilerplatestack-boilerplateauroradbc4ff7a80-zolkr8gylbpk.cluster-cniqg8kg8g2s.eu-central-1.rds.amazonaws.com:5432 ec2-user@18.185.100.195
 ```
 
 3. Then use your db admin tool to connect to port localhost:5432

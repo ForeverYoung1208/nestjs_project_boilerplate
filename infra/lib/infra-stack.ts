@@ -251,11 +251,24 @@ export class AppStack extends cdk.Stack {
       ec2.Port.tcp(6379),
       'Allow Redis access from API',
     );
-    
+
     redisSecurityGroup.addIngressRule(
       workerSecurityGroup,
       ec2.Port.tcp(6379),
       'Allow Redis access from Worker',
+    );
+
+    // Redis parameter group with noeviction policy
+    const redisParameterGroup = new elasticache.CfnParameterGroup(
+      this,
+      `${projectName}RedisParameterGroup`,
+      {
+        cacheParameterGroupFamily: 'redis7.x',
+        description: 'Redis parameter group for queue system',
+        properties: {
+          'maxmemory-policy': 'noeviction', // noeviction - Redis will return errors instead of evicting data when memory is full
+        },
+      },
     );
 
     const redis = new elasticache.CfnCacheCluster(
@@ -264,7 +277,9 @@ export class AppStack extends cdk.Stack {
       {
         cacheNodeType: 'cache.t3.micro',
         engine: 'redis',
+        engineVersion: '7.0',
         numCacheNodes: 1,
+        cacheParameterGroupName: redisParameterGroup.ref,
         vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId],
         cacheSubnetGroupName: new elasticache.CfnSubnetGroup(
           this,
@@ -327,10 +342,7 @@ export class AppStack extends cdk.Stack {
           'secretsmanager:GetSecretValue',
           'secretsmanager:DescribeSecret',
         ],
-        resources: [
-          dbCluster.secret!.secretArn,
-          mailPasswordSecret.secretArn,
-        ],
+        resources: [dbCluster.secret!.secretArn, mailPasswordSecret.secretArn],
       }),
     );
 
@@ -512,24 +524,19 @@ export class AppStack extends cdk.Stack {
             value: apiSecurityGroup.securityGroupId,
           },
           {
-            namespace: 'aws:elasticbeanstalk:environment:process:default',
-            optionName: 'HealthCheckPath',
+            namespace: 'aws:elasticbeanstalk:healthreporting:system',
+            optionName: 'SystemType',
+            value: 'basic',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:application',
+            optionName: 'Application Healthcheck URL',
             value: '/',
           },
           {
-            namespace: 'aws:elasticbeanstalk:environment:process:default',
-            optionName: 'HealthCheckInterval',
-            value: '15',
-          },
-          {
-            namespace: 'aws:elasticbeanstalk:environment:process:default',
-            optionName: 'HealthyThresholdCount',
-            value: '2',
-          },
-          {
-            namespace: 'aws:elasticbeanstalk:environment:process:default',
-            optionName: 'UnhealthyThresholdCount',
-            value: '10',
+            namespace: 'aws:elasticbeanstalk:healthreporting:system',
+            optionName: 'HealthCheckSuccessThreshold',
+            value: 'Ok',
           },
           ...commonEnvVars,
         ],
