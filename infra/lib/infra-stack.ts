@@ -263,7 +263,7 @@ export class AppStack extends cdk.Stack {
       this,
       `${projectName}RedisParameterGroup`,
       {
-        cacheParameterGroupFamily: 'redis7.x',
+        cacheParameterGroupFamily: 'redis7',
         description: 'Redis parameter group for queue system',
         properties: {
           'maxmemory-policy': 'noeviction', // noeviction - Redis will return errors instead of evicting data when memory is full
@@ -524,19 +524,24 @@ export class AppStack extends cdk.Stack {
             value: apiSecurityGroup.securityGroupId,
           },
           {
-            namespace: 'aws:elasticbeanstalk:healthreporting:system',
-            optionName: 'SystemType',
-            value: 'basic',
-          },
-          {
-            namespace: 'aws:elasticbeanstalk:application',
-            optionName: 'Application Healthcheck URL',
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthCheckPath',
             value: '/',
           },
           {
-            namespace: 'aws:elasticbeanstalk:healthreporting:system',
-            optionName: 'HealthCheckSuccessThreshold',
-            value: 'Ok',
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthCheckInterval',
+            value: '15',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthyThresholdCount',
+            value: '2',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'UnhealthyThresholdCount',
+            value: '10',
           },
           ...commonEnvVars,
         ],
