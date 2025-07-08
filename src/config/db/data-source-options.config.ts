@@ -27,9 +27,6 @@ export const dataSourceOptions = registerAs(
         // idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 30000,
       },
-      ssl: {
-        rejectUnauthorized: false,
-      },
     };
   },
 );
