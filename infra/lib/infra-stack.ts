@@ -15,10 +15,9 @@ import {
   projectName,
   fullSubDomainNameApi,
   userDeploerName,
-  secretName,
   databaseUsername,
   companyName,
-  nodeEnv,
+  targetNodeEnv,
 } from '../config';
 
 export class AppStack extends cdk.Stack {
@@ -51,6 +50,18 @@ export class AppStack extends cdk.Stack {
         secretStringValue: cdk.SecretValue.unsafePlainText(
           'set-here-your-email-server-password-after-deploying',
         ),
+      },
+    );
+
+    const apiKeySecret = new secretsmanager.Secret(
+      this,
+      `${projectName}ApiKeySecret`,
+      {
+        description: 'Api key secret',
+        generateSecretString: {
+          excludeCharacters: '/@:"`\'\\;<>{}[]()|&* ',
+          passwordLength: 10,
+        },
       },
     );
 
@@ -140,13 +151,13 @@ export class AppStack extends cdk.Stack {
       'Allow HTTPS',
     );
 
-    // todo: remove after debugging - leave connection possibility onlly through bastion
-    apiSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(22),
-      'Allow ssh',
-    );
-    // ^^^
+    // // todo: remove after debugging - leave connection possibility onlly through bastion
+    // apiSecurityGroup.addIngressRule(
+    //   ec2.Peer.anyIpv4(),
+    //   ec2.Port.tcp(22),
+    //   'Allow ssh',
+    // );
+    // // ^^^
 
     /**
      *
@@ -203,8 +214,11 @@ export class AppStack extends cdk.Stack {
       defaultDatabaseName: databaseName,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       credentials: rds.Credentials.fromGeneratedSecret(databaseUsername, {
-        secretName,
+        excludeCharacters: '/@:"`\'\\;<>{}[]()|&* ',
       }),
+      // credentials: rds.Credentials.fromGeneratedSecret(databaseUsername, {
+      //   secretName,
+      // }),
     });
 
     // workaround to set minimum capacity to 0 to allow full stop of the database if not used
@@ -296,7 +310,7 @@ export class AppStack extends cdk.Stack {
      *
      *
      *
-     *  API
+     * API AND WORKER
      *
      *
      *
@@ -377,7 +391,7 @@ export class AppStack extends cdk.Stack {
 
     const commonEnvVars = [
       ...this.createEnvironmentVariables({
-        NODE_ENV: nodeEnv,
+        NODE_ENV: targetNodeEnv,
         PORT: '3000',
         SITE_ORIGIN: `https://${fullSubDomainNameApi}`,
         DB_HOST: dbCluster.clusterEndpoint.hostname,
@@ -386,7 +400,6 @@ export class AppStack extends cdk.Stack {
         REDIS_HOST: redis.attrRedisEndpointAddress,
         REDIS_PORT: redis.attrRedisEndpointPort,
         TYPEORM_LOGGING: 'false',
-        API_KEY: 'asdfasdf',
         MAILER_TRANSPORT: 'smtp',
         MAIL_HOST: 'smtp-pulse.com',
         MAIL_PORT: '2525',
@@ -395,9 +408,13 @@ export class AppStack extends cdk.Stack {
         MAIL_USERNAME: 'siafin2010@gmail.com',
         MAIL_FROM_EMAIL: 'ihor.shcherbyna@clockwise.software',
         COMPANY_NAME: `"${companyName}"`,
-        // todo: read stuff from .env
       }),
 
+      {
+        namespace: 'aws:elasticbeanstalk:application:environment',
+        optionName: 'API_KEY',
+        value: `{{resolve:secretsmanager:${apiKeySecret.secretArn}}}`,
+      },
       {
         namespace: 'aws:elasticbeanstalk:application:environment',
         optionName: 'MAIL_PASSWORD',
