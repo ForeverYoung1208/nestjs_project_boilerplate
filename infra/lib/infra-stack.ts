@@ -11,20 +11,38 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { SecretValue } from 'aws-cdk-lib';
 
 import { Construct } from 'constructs';
-import {
-  databaseName,
-  domainName,
-  projectName,
-  fullSubDomainNameApi,
-  userDeploerName,
-  databaseUsername,
-  companyName,
-  targetNodeEnv,
-} from '../config';
+
+
+export interface IAppStackConfig {
+  databaseName: string;
+  domainName: string;
+  projectName: string;
+  fullSubDomainNameApi: string;
+  userDeploerName: string;
+  databaseUsername: string;
+  companyName: string;
+  targetNodeEnv: string;
+}
 
 export class AppStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(
+    scope: Construct,
+    id: string,
+    config: IAppStackConfig,
+    props?: cdk.StackProps,
+  ) {
     super(scope, id, props);
+
+    const {
+      databaseName,
+      domainName,
+      projectName,
+      fullSubDomainNameApi,
+      userDeploerName,
+      databaseUsername,
+      companyName,
+      targetNodeEnv,
+    } = config;
 
     /**
      *
