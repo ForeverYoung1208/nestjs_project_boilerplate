@@ -420,7 +420,7 @@ export class AppStack extends cdk.Stack {
         MAIL_TLS: 'true',
         MAIL_USERNAME: 'siafin2010@gmail.com',
         MAIL_FROM_EMAIL: 'ihor.shcherbyna@clockwise.software',
-        COMPANY_NAME: `"${companyName}"`,
+        COMPANY_NAME: companyName,
         DB_USERNAME: databaseUsername,
       }),
 
