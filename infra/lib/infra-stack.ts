@@ -7,7 +7,9 @@ import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as s3assets from 'aws-cdk-lib/aws-s3-assets';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
+import { SecretValue } from 'aws-cdk-lib';
+
 import { Construct } from 'constructs';
 import {
   databaseName,
@@ -42,26 +44,43 @@ export class AppStack extends cdk.Stack {
       userName: userDeploerName,
     });
 
-    const mailPasswordSecret = new secretsmanager.Secret(
+    // Create secrets
+
+    const apiKeySecretValue = Array(10)
+      .fill(null)
+      .map(() => Math.floor(Math.random() * 36).toString(36))
+      .join('');
+    const apiKeyParameter = new ssm.StringParameter(
       this,
-      `${projectName}MailPasswordSecret`,
+      `${projectName}ApiKeyParameter`,
       {
-        description: 'Mail password for the API service',
-        secretStringValue: cdk.SecretValue.unsafePlainText(
-          'set-here-your-email-server-password-after-deploying',
-        ),
+        parameterName: `/${projectName}/api-key`,
+        stringValue: apiKeySecretValue,
+        description: 'API key for the application',
       },
     );
 
-    const apiKeySecret = new secretsmanager.Secret(
+    const dbPasswordParameterValue = Array(10)
+      .fill(null)
+      .map(() => Math.floor(Math.random() * 36).toString(36))
+      .join('');
+    const dbPasswordParameter = new ssm.StringParameter(
       this,
-      `${projectName}ApiKeySecret`,
+      `${projectName}DbPasswordParameter`,
       {
-        description: 'Api key secret',
-        generateSecretString: {
-          excludeCharacters: '/@:"`\'\\;<>{}[]()|&* ',
-          passwordLength: 10,
-        },
+        parameterName: `/${projectName}/db-password`,
+        stringValue: dbPasswordParameterValue,
+        description: 'DB password',
+      },
+    );
+
+    const mailPasswordParameter = new ssm.StringParameter(
+      this,
+      `${projectName}MailPasswordParameter`,
+      {
+        parameterName: `/${projectName}/mail-password`,
+        stringValue: 'place-here-mail-password',
+        description: 'API key for the application',
       },
     );
 
@@ -151,13 +170,13 @@ export class AppStack extends cdk.Stack {
       'Allow HTTPS',
     );
 
-    // // todo: remove after debugging - leave connection possibility onlly through bastion
-    // apiSecurityGroup.addIngressRule(
-    //   ec2.Peer.anyIpv4(),
-    //   ec2.Port.tcp(22),
-    //   'Allow ssh',
-    // );
-    // // ^^^
+    // todo: remove after debugging - leave connection possibility onlly through bastion
+    apiSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(22),
+      'Allow ssh',
+    );
+    // ^^^
 
     /**
      *
@@ -213,12 +232,10 @@ export class AppStack extends cdk.Stack {
 
       defaultDatabaseName: databaseName,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      credentials: rds.Credentials.fromGeneratedSecret(databaseUsername, {
-        excludeCharacters: '/@:"`\'\\;<>{}[]()|&* ',
-      }),
-      // credentials: rds.Credentials.fromGeneratedSecret(databaseUsername, {
-      //   secretName,
-      // }),
+      credentials: rds.Credentials.fromPassword(
+        databaseUsername,
+        SecretValue.unsafePlainText(dbPasswordParameterValue),
+      ),
     });
 
     // workaround to set minimum capacity to 0 to allow full stop of the database if not used
@@ -352,11 +369,10 @@ export class AppStack extends cdk.Stack {
     ebInstanceRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: [
-          'secretsmanager:GetSecretValue',
-          'secretsmanager:DescribeSecret',
+        actions: ['ssm:GetParameter', 'ssm:GetParameters'],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/${projectName}/*`,
         ],
-        resources: [dbCluster.secret!.secretArn, mailPasswordSecret.secretArn],
       }),
     );
 
@@ -386,9 +402,6 @@ export class AppStack extends cdk.Stack {
       `${projectName}AppVersion`,
       appAsset,
     );
-
-    // Create API environment
-
     const commonEnvVars = [
       ...this.createEnvironmentVariables({
         NODE_ENV: targetNodeEnv,
@@ -408,27 +421,23 @@ export class AppStack extends cdk.Stack {
         MAIL_USERNAME: 'siafin2010@gmail.com',
         MAIL_FROM_EMAIL: 'ihor.shcherbyna@clockwise.software',
         COMPANY_NAME: `"${companyName}"`,
+        DB_USERNAME: databaseUsername,
       }),
 
       {
-        namespace: 'aws:elasticbeanstalk:application:environment',
+        namespace: 'aws:elasticbeanstalk:application:environmentsecrets',
         optionName: 'API_KEY',
-        value: `{{resolve:secretsmanager:${apiKeySecret.secretArn}}}`,
+        value: apiKeyParameter.parameterArn,
       },
       {
-        namespace: 'aws:elasticbeanstalk:application:environment',
+        namespace: 'aws:elasticbeanstalk:application:environmentsecrets',
         optionName: 'MAIL_PASSWORD',
-        value: `{{resolve:secretsmanager:${mailPasswordSecret.secretArn}}}`,
+        value: mailPasswordParameter.parameterArn,
       },
       {
-        namespace: 'aws:elasticbeanstalk:application:environment',
-        optionName: 'DB_USERNAME',
-        value: `{{resolve:secretsmanager:${dbCluster.secret!.secretArn}:SecretString:username}}`,
-      },
-      {
-        namespace: 'aws:elasticbeanstalk:application:environment',
+        namespace: 'aws:elasticbeanstalk:application:environmentsecrets',
         optionName: 'DB_PASSWORD',
-        value: `{{resolve:secretsmanager:${dbCluster.secret!.secretArn}:SecretString:password}}`,
+        value: dbPasswordParameter.parameterArn,
       },
     ];
 
@@ -476,7 +485,7 @@ export class AppStack extends cdk.Stack {
       {
         environmentName: `${projectName}-Api-Environment`,
         applicationName: app.applicationName,
-        solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
+        solutionStackName: '64bit Amazon Linux 2023 v6.6.0 running Node.js 22', // Choose appropriate platform
         optionSettings: [
           ...commonOptionSettings,
           {
@@ -573,13 +582,13 @@ export class AppStack extends cdk.Stack {
       {
         environmentName: `${projectName}-Worker-Environment`,
         applicationName: app.applicationName,
-        solutionStackName: '64bit Amazon Linux 2023 v6.4.3 running Node.js 22', // Choose appropriate platform
+        solutionStackName: '64bit Amazon Linux 2023 v6.6.0 running Node.js 22', // Choose appropriate platform
         optionSettings: [
           ...commonOptionSettings,
           {
             namespace: 'aws:ec2:vpc',
             optionName: 'Subnets',
-            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // Use public subnets for internet access. Interned access is needded for elastic beanstalk to finish deployment.
+            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // Use public subnets for internet access. Internet access is needded for elastic beanstalk to finish deployment.
           },
           {
             namespace: 'aws:autoscaling:launchconfiguration',

@@ -28,7 +28,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --selectProjects api-e2e --detectOpenHandles",
-    "test:int": "jest --selectProjects api-integration --detectOpenHandles:"
+    "test:int": "jest --selectProjects api-integration --detectOpenHandles"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
