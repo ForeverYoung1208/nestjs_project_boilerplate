@@ -86,6 +86,8 @@ jobs:
         with:
           name: node_modules
           path: node_modules/ 
+      - name: Install dependencies if needed
+        run: npm ci
       - name: Run migrations
         run: npm run migration:test:run
       - name: Run ingegration tests
