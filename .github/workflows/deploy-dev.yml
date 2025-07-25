@@ -49,5 +49,5 @@ jobs:
           npm install -g aws-cdk
           cd infra
           npm ci
-          cdk deploy --require-approval never --hotswap
+          npx cdk deploy --context targetEnv=dev --require-approval never --hotswap
 
