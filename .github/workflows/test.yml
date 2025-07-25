@@ -33,11 +33,6 @@ jobs:
         with:
           name: build_result
           path: dist/
-      - name: Upload node_modules
-        uses: actions/upload-artifact@v4
-        with:
-          name: node_modules
-          path: node_modules/
 
   test-api:
     runs-on: ubuntu-latest
@@ -67,6 +62,7 @@ jobs:
           compose-file: "./docker/docker-compose.test-ci.yml"
           services: |
             postgres_test
+            redis_test
       - uses: actions/cache@v4
         id: npm-cache
         with:

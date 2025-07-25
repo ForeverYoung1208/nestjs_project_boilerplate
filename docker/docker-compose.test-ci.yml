@@ -12,3 +12,9 @@ services:
       POSTGRES_PASSWORD: password_test
     ports:
       - 5432:5432
+  redis_test:
+    container_name: postgres_test
+    image: redis:7.2.4
+    ports:
+      - 6379:6379
+    command: redis-server
