@@ -33,6 +33,11 @@ jobs:
         with:
           name: build_result
           path: dist/
+      - name: Upload node_modules
+        uses: actions/upload-artifact@v4
+        with:
+          name: node_modules
+          path: node_modules/
 
   test-api:
     runs-on: ubuntu-latest
@@ -71,11 +76,16 @@ jobs:
             **/.env.test
             **/.env.example
           key: ${{ runner.os }}-node-yarn-${{ hashFiles('**/package-lock.json', '**/.env.test', '**/.env.example') }}
-      - name: Get build result
+      - name: Get build result artifact
         uses: actions/download-artifact@v4
         with:
           name: build_result
-          path: dist/
+          path: dist/ 
+      - name: Get node_modules artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: node_modules
+          path: node_modules/ 
       - name: Run migrations
         run: npm run migration:test:run
       - name: Run ingegration tests
