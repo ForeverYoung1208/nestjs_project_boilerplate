@@ -1,49 +1,58 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as rds from 'aws-cdk-lib/aws-rds';
-import * as logs from 'aws-cdk-lib/aws-logs';
+import * as elasticbeanstalk from 'aws-cdk-lib/aws-elasticbeanstalk';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
-import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
-import * as targets from 'aws-cdk-lib/aws-route53-targets';
+import * as s3assets from 'aws-cdk-lib/aws-s3-assets';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import { buildDocker } from './build-docker';
-import { Construct } from 'constructs';
-import {
-  databaseName,
-  dockerHubImage,
-  domainName,
-  projectName,
-  subDomainNameApi,
-  userDeploerName,
-  secretName,
-  databaseUsername,
-  nodeEnv,
-  companyName,
-} from '../config';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
+import { SecretValue } from 'aws-cdk-lib';
 
-export class BoilerplateStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+import { Construct } from 'constructs';
+
+
+export interface IAppStackConfig {
+  databaseName: string;
+  domainName: string;
+  projectName: string;
+  fullSubDomainNameApi: string;
+  userDeploerName: string;
+  databaseUsername: string;
+  companyName: string;
+  targetNodeEnv: string;
+}
+
+export class AppStack extends cdk.Stack {
+  constructor(
+    scope: Construct,
+    id: string,
+    config: IAppStackConfig,
+    props?: cdk.StackProps,
+  ) {
     super(scope, id, props);
 
+    const {
+      databaseName,
+      domainName,
+      projectName,
+      fullSubDomainNameApi,
+      userDeploerName,
+      databaseUsername,
+      companyName,
+      targetNodeEnv,
+    } = config;
+
     /**
+     *
+     *
+     *
      * COMMON
+     *
+     *
+     *
      */
-    const shouldBuildDocker =
-      this.node.tryGetContext('buildDocker') !== 'false';
-    if (shouldBuildDocker) {
-      try {
-        buildDocker();
-      } catch (error) {
-        console.error('Failed to build and push Docker image:', error);
-        throw error;
-      }
-    } else {
-      console.log('Skipping Docker build step');
-    }
 
     // Add tag for cost tracking
     cdk.Tags.of(this).add('AppManagerCFNStackKey', this.stackName);
@@ -53,37 +62,73 @@ export class BoilerplateStack extends cdk.Stack {
       userName: userDeploerName,
     });
 
+    // Create secrets
+
+    const apiKeySecretValue = Array(10)
+      .fill(null)
+      .map(() => Math.floor(Math.random() * 36).toString(36))
+      .join('');
+    const apiKeyParameter = new ssm.StringParameter(
+      this,
+      `${projectName}ApiKeyParameter`,
+      {
+        parameterName: `/${projectName}/api-key`,
+        stringValue: apiKeySecretValue,
+        description: 'API key for the application',
+      },
+    );
+
+    const dbPasswordParameterValue = Array(10)
+      .fill(null)
+      .map(() => Math.floor(Math.random() * 36).toString(36))
+      .join('');
+    const dbPasswordParameter = new ssm.StringParameter(
+      this,
+      `${projectName}DbPasswordParameter`,
+      {
+        parameterName: `/${projectName}/db-password`,
+        stringValue: dbPasswordParameterValue,
+        description: 'DB password',
+      },
+    );
+
+    const mailPasswordParameter = new ssm.StringParameter(
+      this,
+      `${projectName}MailPasswordParameter`,
+      {
+        parameterName: `/${projectName}/mail-password`,
+        stringValue: 'place-here-mail-password',
+        description: 'API key for the application',
+      },
+    );
+
     /**
+     *
+     *
+     *
      * NETWORKS
+     *
+     *
+     *
      */
 
     // VPC
-    const vpc = new ec2.Vpc(this, 'MyVPC', {
-      maxAzs: 2,
-      natGateways: 1,
-    });
-
-    // Security Group for ALB
-    const albSecurityGroup = new ec2.SecurityGroup(this, 'ALBSG', {
-      vpc,
-      allowAllOutbound: true,
-    });
-    albSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(80),
-      'Allow HTTP traffic',
-    );
-    albSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(443),
-      'Allow HTTPS traffic',
-    );
-
-    // Application Load Balancer
-    const alb = new elbv2.ApplicationLoadBalancer(this, 'ALB', {
-      vpc,
-      internetFacing: true,
-      securityGroup: albSecurityGroup,
+    const vpc = new ec2.Vpc(this, `${projectName}VPC`, {
+      ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
+      maxAzs: 2, // Need 2 AZs for Aurora
+      natGateways: 0,
+      subnetConfiguration: [
+        {
+          cidrMask: 24,
+          name: 'Public',
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+        {
+          cidrMask: 23,
+          name: 'Private',
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED, // Use PRIVATE_ISOLATED instead of PRIVATE_WITH_EGRESS - no need for aura and redis to access internet
+        },
+      ],
     });
 
     //Lookup the zone based on domain name
@@ -92,63 +137,123 @@ export class BoilerplateStack extends cdk.Stack {
     });
 
     // ACM Certificate
-    const certificate = new certificatemanager.Certificate(this, 'ALBCert', {
-      domainName: subDomainNameApi,
-      validation: certificatemanager.CertificateValidation.fromDns(zone),
-    });
+    const certificate = new certificatemanager.Certificate(
+      this,
+      `${projectName}Certificate`,
+      {
+        domainName: fullSubDomainNameApi,
+        validation: certificatemanager.CertificateValidation.fromDns(zone),
+      },
+    );
 
-    // Add API subdomain to the zone
-    new route53.ARecord(this, 'ApiDNS', {
-      zone,
-      recordName: subDomainNameApi,
-      target: route53.RecordTarget.fromAlias(
-        new targets.LoadBalancerTarget(alb),
-      ),
-    });
+    const apiSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}ApiSecurityGroup`,
+      {
+        vpc,
+        description: 'Serurity group for API',
+        allowAllOutbound: true,
+      },
+    );
 
-    // HTTPS Listener
-    const httpsListener = alb.addListener('HttpsListener', {
-      port: 443,
-      certificates: [certificate],
-      open: true,
-    });
+    const workerSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}WorkerSecurityGroup`,
+      {
+        vpc,
+        description: 'Security group for Worker',
+        allowAllOutbound: true,
+      },
+    );
 
-    // HTTP Listener (Redirect to HTTPS)
-    alb.addListener('HttpListener', {
-      port: 80,
-      defaultAction: elbv2.ListenerAction.redirect({
-        protocol: 'HTTPS',
-        port: '443',
-      }),
-    });
+    const albSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}AlbSecurityGroup`,
+      {
+        vpc,
+        description: 'Security group for API ALB',
+        allowAllOutbound: true,
+      },
+    );
+
+    apiSecurityGroup.addIngressRule(
+      ec2.Peer.securityGroupId(albSecurityGroup.securityGroupId),
+      ec2.Port.tcp(3000),
+      'Allow traffic from ALB',
+    );
+
+    albSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(443),
+      'Allow HTTPS',
+    );
+
+    // todo: remove after debugging - leave connection possibility onlly through bastion
+    apiSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(22),
+      'Allow ssh',
+    );
+    // ^^^
 
     /**
+     *
+     *
+     *
      * DATABASE
+     *
+     *
+     *
      */
 
     const engine = rds.DatabaseClusterEngine.auroraPostgres({
       version: rds.AuroraPostgresEngineVersion.VER_15_7,
     });
     // Aurora PostgreSQL Serverless
-    const dbCluster = new rds.DatabaseCluster(this, 'AuroraDB', {
+    const dbSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}DatabaseSecurityGroup`,
+      {
+        vpc,
+        description: 'Security group for RDS',
+        allowAllOutbound: true,
+      },
+    );
+
+    dbSecurityGroup.addIngressRule(
+      apiSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from API',
+    );
+
+    const dbCluster = new rds.DatabaseCluster(this, `${projectName}AuroraDB`, {
       engine,
       vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      },
+      securityGroups: [dbSecurityGroup],
       writer: rds.ClusterInstance.serverlessV2('writer'),
       serverlessV2MinCapacity: 0.5, // Minimum ACU (0.5 is the minimum?)
       serverlessV2MaxCapacity: 1, // Maximum ACU
-      parameterGroup: new rds.ParameterGroup(this, 'ParameterGroup', {
-        engine,
-        parameters: {
-          // Terminate idle session for Aurora Serverless V2 auto-pause
-          idle_session_timeout: '60000',
+      parameterGroup: new rds.ParameterGroup(
+        this,
+        `${projectName}RdsParameterGroup`,
+        {
+          engine,
+          parameters: {
+            // Terminate idle session for Aurora Serverless V2 auto-pause
+            idle_session_timeout: '60000',
+          },
         },
-      }),
+      ),
 
       defaultDatabaseName: databaseName,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      credentials: rds.Credentials.fromGeneratedSecret(databaseUsername, {
-        secretName,
-      }),
+      credentials: rds.Credentials.fromPassword(
+        databaseUsername,
+        SecretValue.unsafePlainText(dbPasswordParameterValue),
+      ),
     });
 
     // workaround to set minimum capacity to 0 to allow full stop of the database if not used
@@ -157,74 +262,175 @@ export class BoilerplateStack extends cdk.Stack {
       0,
     );
 
+    // assign necessary access permissions
+    dbCluster.connections.allowFrom(
+      apiSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow database access from API',
+    );
+
+    dbCluster.connections.allowFrom(
+      workerSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow database access from Worker',
+    );
+
     /**
-     *  API
+     *
+     *
+     *
+     *  QUEUE
+     *
+     *
+     *
      */
 
-    // API Security groups
-    const apiSecurityGroup = new ec2.SecurityGroup(this, 'ApiSecurityGroup', {
-      vpc,
-      allowAllOutbound: true,
-      description: 'security group for api',
-    });
-    apiSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(80),
-      'allow HTTP traffic',
+    // ElastiCache Redis
+    const redisSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}RedisSG`,
+      {
+        vpc,
+        allowAllOutbound: true,
+      },
     );
-    apiSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(443),
-      'allow HTTPS traffic',
+    // Add security group rule to allow Redis access
+    redisSecurityGroup.addIngressRule(
+      apiSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis access from API',
     );
 
-    // API Cluster
-    const apiCluster = new ecs.Cluster(this, 'ApiCluster', {
-      vpc,
+    redisSecurityGroup.addIngressRule(
+      workerSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis access from Worker',
+    );
+
+    // Redis parameter group with noeviction policy
+    const redisParameterGroup = new elasticache.CfnParameterGroup(
+      this,
+      `${projectName}RedisParameterGroup`,
+      {
+        cacheParameterGroupFamily: 'redis7',
+        description: 'Redis parameter group for queue system',
+        properties: {
+          'maxmemory-policy': 'noeviction', // noeviction - Redis will return errors instead of evicting data when memory is full
+        },
+      },
+    );
+
+    const redis = new elasticache.CfnCacheCluster(
+      this,
+      `${projectName}RedisCluster`,
+      {
+        cacheNodeType: 'cache.t3.micro',
+        engine: 'redis',
+        engineVersion: '7.0',
+        numCacheNodes: 1,
+        cacheParameterGroupName: redisParameterGroup.ref,
+        vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId],
+        cacheSubnetGroupName: new elasticache.CfnSubnetGroup(
+          this,
+          `${projectName}RedisSubnetGroup`,
+          {
+            description: 'Subnet group for Redis cluster',
+            subnetIds: vpc.isolatedSubnets.map((subnet) => subnet.subnetId),
+          },
+        ).ref,
+      },
+    );
+
+    /**
+     *
+     *
+     *
+     * API AND WORKER
+     *
+     *
+     *
+     */
+
+    // Create an S3 asset for application code
+
+    const appAsset = new s3assets.Asset(this, `${projectName}ApiAsset`, {
+      path: '../', // Point to parent directory
+      exclude: [
+        '.git',
+        '.github',
+        '.vscode',
+        'docker',
+        'infra', // exclude CDK infrastructure code
+        'src',
+        'test',
+        '.env*',
+        '**/*.spec.ts',
+        'node_modules',
+        // add any other files/folders you want to exclude
+      ],
     });
 
-    // API Task Role (task for Api Cluster)
-    const taskRole = new iam.Role(this, 'TaskRole', {
-      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    // Create IAM role for EC2 instances
+    const ebInstanceRole = new iam.Role(this, `${projectName}EBInstanceRole`, {
+      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName(
-          'service-role/AmazonECSTaskExecutionRolePolicy',
+          'AWSElasticBeanstalkWebTier',
+        ),
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          'AWSElasticBeanstalkWorkerTier',
         ),
       ],
     });
 
-    // API Fargate Service (Single Instance, No Auto-Scaling)
-    const apiTaskDefinition = new ecs.FargateTaskDefinition(
-      this,
-      'ApiTaskDef',
-      { taskRole },
+    // Add Secrets Manager permissions
+    ebInstanceRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['ssm:GetParameter', 'ssm:GetParameters'],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/${projectName}/*`,
+        ],
+      }),
     );
 
-    const mailPasswordSecret = new secretsmanager.Secret(
+    // Create instance profile
+    const ebInstanceProfile = new iam.CfnInstanceProfile(
       this,
-      'MailPasswordSecret',
+      `${projectName}EBInstanceProfile`,
       {
-        description: 'Mail password for the API service',
+        roles: [ebInstanceRole.roleName],
       },
     );
-    mailPasswordSecret.grantRead(apiTaskDefinition.taskRole);
 
-    apiTaskDefinition.addContainer('ApiContainer', {
-      image: ecs.ContainerImage.fromRegistry(dockerHubImage),
-      command: ['/bin/sh', '-c', 'npm run migration:run && npm run start:prod'],
-      memoryLimitMiB: 512,
-      cpu: 256,
-      environment: {
+    // Create Elastic Beanstalk application
+    const app = new elasticbeanstalk.CfnApplication(
+      this,
+      `${projectName}Application`,
+      {
+        applicationName: `${projectName}-application`,
+      },
+    );
+    if (!app.applicationName) {
+      throw new Error('app.applicationName is undefined');
+    }
+
+    const versionLabel = this.createApplicationVersion(
+      app,
+      `${projectName}AppVersion`,
+      appAsset,
+    );
+    const commonEnvVars = [
+      ...this.createEnvironmentVariables({
+        NODE_ENV: targetNodeEnv,
         PORT: '3000',
-        NODE_ENV: nodeEnv,
-        SITE_ORIGIN: `https://${subDomainNameApi}`,
+        SITE_ORIGIN: `https://${fullSubDomainNameApi}`,
         DB_HOST: dbCluster.clusterEndpoint.hostname,
-        DB_PORT: '5432',
+        DB_PORT: dbCluster.clusterEndpoint.port.toString(),
         DB_DATABASE: databaseName,
-        // REDIS_HOST: set at the redis section below
-        // REDIS_PORT: set at the redis section below
+        REDIS_HOST: redis.attrRedisEndpointAddress,
+        REDIS_PORT: redis.attrRedisEndpointPort,
         TYPEORM_LOGGING: 'false',
-        API_KEY: 'asdfasdf',
         MAILER_TRANSPORT: 'smtp',
         MAIL_HOST: 'smtp-pulse.com',
         MAIL_PORT: '2525',
@@ -233,97 +439,435 @@ export class BoilerplateStack extends cdk.Stack {
         MAIL_USERNAME: 'siafin2010@gmail.com',
         MAIL_FROM_EMAIL: 'ihor.shcherbyna@clockwise.software',
         COMPANY_NAME: companyName,
-        // todo: read stuff from .env
-      },
-      secrets: {
-        // Get credentials from Secrets Manager
-        MAIL_PASSWORD: ecs.Secret.fromSecretsManager(mailPasswordSecret),
-        DB_USERNAME: ecs.Secret.fromSecretsManager(
-          dbCluster.secret!,
-          'username',
-        ),
-        DB_PASSWORD: ecs.Secret.fromSecretsManager(
-          dbCluster.secret!,
-          'password',
-        ),
-      },
-      portMappings: [{ containerPort: 3000 }],
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: 'api-container',
-        logRetention: logs.RetentionDays.ONE_WEEK,
+        DB_USERNAME: databaseUsername,
       }),
-    });
 
-    const apiService = new ecs.FargateService(this, 'ApiService', {
-      cluster: apiCluster,
-      taskDefinition: apiTaskDefinition,
-      desiredCount: 1,
-      securityGroups: [apiSecurityGroup],
-      healthCheckGracePeriod: cdk.Duration.seconds(60), // Give time for DB connection
-    });
-
-    // Make service depend on DB cluster
-    apiService.node.addDependency(dbCluster);
-
-    // Attach API Service to Load Balancer via HTTPS
-    httpsListener.addTargets('ApiTarget', {
-      port: 80,
-      targets: [
-        apiService.loadBalancerTarget({
-          containerName: 'ApiContainer',
-          containerPort: 3000,
-        }),
-      ],
-      healthCheck: {
-        path: '/',
-        interval: cdk.Duration.seconds(60),
-        timeout: cdk.Duration.seconds(30),
-        healthyThresholdCount: 3,
-        unhealthyThresholdCount: 3,
+      {
+        namespace: 'aws:elasticbeanstalk:application:environmentsecrets',
+        optionName: 'API_KEY',
+        value: apiKeyParameter.parameterArn,
       },
+      {
+        namespace: 'aws:elasticbeanstalk:application:environmentsecrets',
+        optionName: 'MAIL_PASSWORD',
+        value: mailPasswordParameter.parameterArn,
+      },
+      {
+        namespace: 'aws:elasticbeanstalk:application:environmentsecrets',
+        optionName: 'DB_PASSWORD',
+        value: dbPasswordParameter.parameterArn,
+      },
+    ];
+
+    const keyPairApi = new ec2.CfnKeyPair(this, `${projectName}ApiKeyPair`, {
+      keyName: `${projectName}-api-key`,
     });
 
-    // Allow API Service to connect to DB
-    // todo take port from config or .env
-    dbCluster.connections.allowFrom(apiSecurityGroup, ec2.Port.tcp(5432));
-
-    /**
-     *  QUEUE
-     */
-
-    // ElastiCache Redis
-    const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSG', {
-      vpc,
-      allowAllOutbound: true,
-    });
-
-    const redis = new elasticache.CfnCacheCluster(this, 'RedisCluster', {
-      cacheNodeType: 'cache.t3.micro',
-      engine: 'redis',
-      numCacheNodes: 1,
-      vpcSecurityGroupIds: [redisSecurityGroup.securityGroupId],
-      cacheSubnetGroupName: new elasticache.CfnSubnetGroup(
-        this,
-        'RedisSubnetGroup',
+    const commonOptionSettings: elasticbeanstalk.CfnEnvironment.OptionSettingProperty[] =
+      [
         {
-          description: 'Subnet group for Redis cluster',
-          subnetIds: vpc.privateSubnets.map((subnet) => subnet.subnetId),
+          namespace: 'aws:ec2:vpc',
+          optionName: 'VPCId',
+          value: vpc.vpcId,
         },
-      ).ref,
-    });
+        {
+          namespace: 'aws:autoscaling:launchconfiguration',
+          optionName: 'IamInstanceProfile',
+          value: ebInstanceProfile.attrArn,
+        },
+        {
+          namespace: 'aws:ec2:instances',
+          optionName: 'InstanceTypes',
+          value: 't2.nano',
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:cloudwatch:logs',
+          optionName: 'StreamLogs',
+          value: 'true',
+        },
+        {
+          namespace: 'aws:elasticbeanstalk:cloudwatch:logs:health',
+          optionName: 'HealthStreamingEnabled',
+          value: 'true',
+        },
+        {
+          namespace: 'aws:autoscaling:launchconfiguration',
+          optionName: 'EC2KeyName',
+          value: keyPairApi.keyName,
+        },
+      ];
 
-    // Allow API to access Redis
-    redisSecurityGroup.addIngressRule(
-      apiSecurityGroup,
-      ec2.Port.tcp(6379),
-      'Allow Redis traffic from API',
+    const apiEnvironment = new elasticbeanstalk.CfnEnvironment(
+      this,
+      `${projectName}ApiEnvironment`,
+      {
+        environmentName: `${projectName}-Api-Environment`,
+        applicationName: app.applicationName,
+        solutionStackName: '64bit Amazon Linux 2023 v6.6.0 running Node.js 22', // Choose appropriate platform
+        optionSettings: [
+          ...commonOptionSettings,
+          {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'Subnets',
+            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','),
+          },
+          {
+            namespace: 'aws:elbv2:loadbalancer',
+            optionName: 'SecurityGroups',
+            value: albSecurityGroup.securityGroupId,
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment',
+            optionName: 'EnvironmentType',
+            value: 'LoadBalanced',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MinSize',
+            value: '1',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MaxSize',
+            value: '2', // Increased to allow for replacement during updates
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment',
+            optionName: 'LoadBalancerType',
+            value: 'application',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'Port',
+            value: '3000',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'Protocol',
+            value: 'HTTP',
+          },
+          {
+            namespace: 'aws:elbv2:listener:443',
+            optionName: 'Protocol',
+            value: 'HTTPS',
+          },
+          // Redirect HTTP to HTTPS
+          {
+            namespace: 'aws:elbv2:listener:default',
+            optionName: 'ListenerEnabled',
+            value: 'false',
+          },
+          {
+            namespace: 'aws:elbv2:listener:443',
+            optionName: 'SSLCertificateArns',
+            value: certificate.certificateArn,
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'SecurityGroups',
+            value: apiSecurityGroup.securityGroupId,
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthCheckPath',
+            value: '/',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthCheckInterval',
+            value: '15',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'HealthyThresholdCount',
+            value: '2',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment:process:default',
+            optionName: 'UnhealthyThresholdCount',
+            value: '10',
+          },
+          ...commonEnvVars,
+        ],
+        versionLabel,
+      },
     );
 
-    // Update the container environment variables
-    const apiContainer = apiTaskDefinition.findContainer('ApiContainer');
-    if (apiContainer) {
-      apiContainer.addEnvironment('REDIS_HOST', redis.attrRedisEndpointAddress);
-      apiContainer.addEnvironment('REDIS_PORT', redis.attrRedisEndpointPort);
+    // Create Worker environment
+    const workerEnvironment = new elasticbeanstalk.CfnEnvironment(
+      this,
+      `${projectName}WorkerEnvironment`,
+      {
+        environmentName: `${projectName}-Worker-Environment`,
+        applicationName: app.applicationName,
+        solutionStackName: '64bit Amazon Linux 2023 v6.6.0 running Node.js 22', // Choose appropriate platform
+        optionSettings: [
+          ...commonOptionSettings,
+          {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'Subnets',
+            value: vpc.publicSubnets.map((subnet) => subnet.subnetId).join(','), // Use public subnets for internet access. Internet access is needded for elastic beanstalk to finish deployment.
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'SecurityGroups',
+            value: workerSecurityGroup.securityGroupId,
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:application:environment',
+            optionName: 'MODE',
+            value: 'WORKER',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MinSize',
+            value: '1',
+          },
+          {
+            namespace: 'aws:autoscaling:asg',
+            optionName: 'MaxSize',
+            value: '1',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:environment',
+            optionName: 'EnvironmentType',
+            value: 'SingleInstance', // This ensures single instance deployment
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'DisableIMDSv1',
+            value: 'true',
+          },
+          {
+            namespace: 'aws:ec2:vpc',
+            optionName: 'AssociatePublicIpAddress',
+            value: 'true',
+          },
+          {
+            namespace: 'aws:elasticbeanstalk:healthreporting:system',
+            optionName: 'SystemType',
+            value: 'enhanced', // Enable enhanced health reporting
+          },
+          {
+            namespace: 'aws:autoscaling:launchconfiguration',
+            optionName: 'MonitoringInterval',
+            value: '5 minutes', // Enable detailed monitoring
+          },
+          ...commonEnvVars,
+        ],
+        versionLabel,
+      },
+    );
+
+    /**
+     *
+     *
+     *
+     * Bastion instance for debugging purposes
+     *
+     *
+     *
+     */
+    const bastionSecurityGroup = new ec2.SecurityGroup(
+      this,
+      `${projectName}BastionSecurityGroup`,
+      {
+        vpc,
+        description: 'Security group for Bastion Host',
+        allowAllOutbound: true,
+      },
+    );
+    // Allow SSH access
+    bastionSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      // ec2.Peer.ipv4('YOUR_IP_ADDRESS/32'),  // Replace with your IP address if want to restrict
+      ec2.Port.tcp(22),
+      'Allow SSH',
+    );
+    // Add this after VPC definition but before the bastion host
+    const keyPair = new ec2.CfnKeyPair(this, `${projectName}BastionKeyPair`, {
+      keyName: `${projectName}-bastion-key`,
+    });
+
+    // Create bastion host
+    const bastion = new ec2.Instance(this, `${projectName}BastionHost`, {
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC, // Place in public subnet
+      },
+      securityGroup: bastionSecurityGroup,
+      instanceType: ec2.InstanceType.of(
+        ec2.InstanceClass.T2,
+        ec2.InstanceSize.NANO,
+      ),
+      machineImage: new ec2.AmazonLinuxImage({
+        generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023,
+      }),
+      keyPair: ec2.KeyPair.fromKeyPairName(
+        this,
+        'BastionKeyPairReference',
+        keyPair.keyName,
+      ),
+    });
+
+    // Allow bastion to access Aurora
+    dbSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from Bastion',
+    );
+
+    // Allow bastion to access Redis
+    redisSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis access from Bastion',
+    );
+
+    // Allow bastion to access Api
+    apiSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(22),
+      'Allow SSH access from Bastion to API',
+    );
+
+    // Allow bastion to access Worker
+    workerSecurityGroup.addIngressRule(
+      bastionSecurityGroup,
+      ec2.Port.tcp(22),
+      'Allow bastion to access Worker',
+    );
+
+    /**
+     *
+     *
+     *
+     * Finalize access and dependancies
+     *
+     *
+     *
+     */
+
+    new route53.CnameRecord(this, `${projectName}ApiAlias`, {
+      zone,
+      recordName: fullSubDomainNameApi,
+      domainName: apiEnvironment.attrEndpointUrl,
+    });
+
+    // Add explicit dependencies
+    workerEnvironment.addDependency(
+      workerSecurityGroup.node.defaultChild as cdk.CfnResource,
+    );
+    workerEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
+
+    // Also add dependency for API environment
+    apiEnvironment.addDependency(
+      apiSecurityGroup.node.defaultChild as cdk.CfnResource,
+    );
+    apiEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
+
+    workerEnvironment.addDependency(
+      // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
+      dbCluster.node.defaultChild as cdk.CfnResource,
+    );
+    workerEnvironment.addDependency(redis);
+
+    /**
+     *
+     *
+     *
+     *  Outputs
+     *
+     *
+     *
+     */
+    // Bastion's public IP to connect
+    new cdk.CfnOutput(this, 'BastionPublicIP', {
+      value: bastion.instancePublicIp,
+    });
+
+    // Output just the key name instead of trying to get the private key
+    new cdk.CfnOutput(this, 'BastionSSHKeyOutput', {
+      value: keyPair.keyName,
+      description:
+        'Key pair name for SSH access to bastion host. Get the private key from SSM Parameter Store.',
+    });
+    new cdk.CfnOutput(this, 'ApiSSHKeyOutput', {
+      value: keyPairApi.keyName,
+      description:
+        'Key pair name for SSH access to bastion host. Get the private key from SSM Parameter Store.',
+    });
+
+    // Add output for the command to retrieve the private key
+    new cdk.CfnOutput(this, 'SSHKeyCommand', {
+      value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.getAtt('KeyPairId')} --with-decryption --query Parameter.Value --output text`,
+      description: 'Command to get the private key from SSM Parameter Store',
+    });
+
+    new cdk.CfnOutput(this, 'ApiInstanceAddress', {
+      value: apiEnvironment.attrEndpointUrl,
+      description: 'IP(case single instance)/URL(case ALB) of the API instance',
+    });
+
+    new cdk.CfnOutput(this, 'ApiInstancePublicDNS', {
+      value:
+        'aws ec2 describe-instances --filters "Name=tag:elasticbeanstalk:environment-name,Values=boilerplate-Api-Environment" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].PublicDnsName" --output text',
+      description: 'Command to get API instance public DNS for SSH access',
+    });
+
+    new cdk.CfnOutput(this, 'WorkerInstanceAddress', {
+      value: workerEnvironment.attrEndpointUrl,
+      description:
+        'IP(case single instance)/URL(case ALB) of the WORKER instance',
+    });
+
+    // Outputs for connecting via Bastion
+    new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
+      value: dbCluster.clusterEndpoint.hostname,
+      description: 'Aurora RDS cluster endpoint hostname',
+    });
+    new cdk.CfnOutput(this, 'AuroraClusterPort', {
+      value: dbCluster.clusterEndpoint.port.toString(),
+      description: 'Aurora RDS cluster port',
+    });
+    new cdk.CfnOutput(this, 'RedisEndpoint', {
+      value: redis.attrRedisEndpointAddress,
+      description: 'Redis cluster endpoint address',
+    });
+    new cdk.CfnOutput(this, 'RedisPort', {
+      value: redis.attrRedisEndpointPort,
+      description: 'Redis cluster port',
+    });
+  }
+
+  private createApplicationVersion(
+    app: elasticbeanstalk.CfnApplication,
+    versionLabel: string,
+    asset: s3assets.Asset,
+  ): string {
+    if (!app.applicationName) {
+      throw new Error('app.applicationName is undefined');
     }
+    const version = new elasticbeanstalk.CfnApplicationVersion(
+      this,
+      versionLabel,
+      {
+        applicationName: app.applicationName,
+        sourceBundle: {
+          s3Bucket: asset.s3BucketName,
+          s3Key: asset.s3ObjectKey,
+        },
+      },
+    );
+    version.addDependency(app);
+    return version.ref;
+  }
+
+  private createEnvironmentVariables(envVars: Record<string, string>) {
+    return Object.entries(envVars).map(([key, value]) => ({
+      namespace: 'aws:elasticbeanstalk:application:environment',
+      optionName: key,
+      value: value,
+    }));
   }
 }

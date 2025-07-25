@@ -5,7 +5,6 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -60,9 +59,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: isbang/compose-action@v1.5.1
         with:
-          compose-file: "./docker/docker-compose.yml"
+          compose-file: "./docker/docker-compose.test-ci.yml"
           services: |
             postgres_test
+            redis_test
       - uses: actions/cache@v4
         id: npm-cache
         with:
@@ -71,12 +71,14 @@ jobs:
             **/node_modules
             **/.env.test
             **/.env.example
-          key: ${{ runner.os }}-node-yarn-${{ hashFiles('**/package-lock.json', '**/.env.test', '**/.env.example') }}
-      - name: Get build result
+          key: ${{ runner.os }}-node-npm-${{ hashFiles('**/package-lock.json', '**/.env.test', '**/.env.example') }}
+      - run: npm ci
+      - name: Get build result artifact
         uses: actions/download-artifact@v4
         with:
           name: build_result
-          path: dist/
+          path: dist/ 
+      - run: cp .env.test-ci .env.test -f
       - name: Run migrations
         run: npm run migration:test:run
       - name: Run ingegration tests

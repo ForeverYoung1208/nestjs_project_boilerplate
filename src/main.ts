@@ -8,7 +8,7 @@ import { validationPipeConfig } from './config/validation-pipe.config';
 import { AuthTypes } from './modules/auth/constants';
 import { initializeTransactionalContext } from 'typeorm-transactional';
 
-async function bootstrap() {
+export async function bootstrap() {
   initializeTransactionalContext();
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);

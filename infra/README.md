@@ -9,9 +9,6 @@ $ docker login -u <username>
 and enter access key in prompt
 
 
-
-
-
 ## Useful commands
 
 * `npm run build`   compile typescript to js
@@ -20,3 +17,92 @@ and enter access key in prompt
 * `npx cdk deploy`  deploy this stack to your default AWS account/region
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
+
+
+# Connecting to the database though bastion
+
+1. Get the SSH key and bastion IP from outputs.
+
+You can use `cdk deploy` if nothing changed, it just will prompt outputs.
+
+OR After deployment, run the commands from your CDK outputs:
+
+Get bastion IP (from CDK output)
+```
+$ aws cloudformation describe-stacks --stack-name boilerplateStack --query 'Stacks[0].Outputs[?OutputKey==`BastionPublicIP`].OutputValue' --output text
+```
+
+Get SSH private key 
+example: (composed command with KEY_PAIR_ID you can find in outpusts  as SSHKeyCommand)
+```
+aws ssm get-parameter --name "/ec2/keypair/$(aws ec2 describe-key-pairs --key-names boilerplate-bastion-key --query 'KeyPairs[0].KeyPairId' --output text)" --with-decryption --query Parameter.Value --output text > boilerplate-bastion-key.pem
+chmod 400 bastion-key.pem
+```
+
+
+
+2. Setup ssh tunnel port from localhost:5432  to AuroraClusterEndpoint through bastion 18.153.68.156 (use your AuroraClusterEndpoint and your IP )
+```
+ssh -i boilerplate-bastion-key.pem -L 5432:boilerplatestack-boilerplateauroradbc4ff7a80-zolkr8gylbpk.cluster-cniqg8kg8g2s.eu-central-1.rds.amazonaws.com:5432 ec2-user@18.185.100.195
+```
+
+3. Then use your db admin tool to connect to port localhost:5432
+credentials (username, db, password) you must get from AWS console -> AWS Secrets Manager -> Secrets
+or use aws cdk command
+```
+aws secretsmanager get-secret-value --secret-id <<secretName_from_config.ts>> --query SecretString --output text | jq '.'
+```
+for example
+```
+aws secretsmanager get-secret-value --secret-id boilerplate-db-credentials --query SecretString --output text | jq '.'
+```
+
+## Other  useful commands
+
+get stack information: projectName = 'boilerplate' (from config.ts) Stack is created as new AppStack(app, '${projectName}Stack') (from infra.ts) So the final stack name is boilerplateStack
+```
+aws cloudformation describe-stacks --stack-name boilerplateStack
+```
+
+Connect to bastion
+```
+ssh -i bastion-key.pem ec2-user@18.153.68.156
+```
+
+
+fetch key to connect to api
+```
+aws ssm get-parameter --name "/ec2/keypair/$(aws ec2 describe-key-pairs --key-names boilerplate-api-key --query 'KeyPairs[0].KeyPairId' --output text)" --with-decryption --query Parameter.Value --output text > boilerplate-api-key.pem
+chmod 400 boilerplate-api-key.pem
+```
+
+
+login from bastion to api
+```
+ssh -i boilerplate-api-key.pem ec2-user@ec2-3-69-31-83.eu-central-1.compute.amazonaws.com
+```
+
+## postgres
+```install client
+sudo dnf install postgresql15
+```
+
+```get credentials
+aws secretsmanager get-secret-value --secret-id boilerplate-db-credentials --query SecretString --output text | jq '.'
+```
+
+```connect
+psql -h boilerplatestack-boilerplateauroradbc4ff7a80-zolkr8gylbpk.cluster-cniqg8kg8g2s.eu-central-1.rds.amazonaws.com -U your_username -d your_database_name
+```
+
+```list databases
+\list
+```
+
+```change database
+\c boilerplate
+```
+
+```list tables
+\dt
+```
