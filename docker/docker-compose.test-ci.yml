@@ -5,7 +5,7 @@ services:
     container_name: postgres_test
     build:
       context: ./postgres      
-      dockerfile: postgres/Dockerfile
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: someproject_test
       POSTGRES_USER: username_test
