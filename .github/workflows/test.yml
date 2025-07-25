@@ -67,16 +67,21 @@ jobs:
           compose-file: "./docker/docker-compose.test-ci.yml"
           services: |
             postgres_test
+      - uses: actions/cache@v4
+        id: npm-cache
+        with:
+          path: |
+            ~/.npm
+            **/node_modules
+            **/.env.test
+            **/.env.example
+          key: ${{ runner.os }}-node-npm-${{ hashFiles('**/package-lock.json', '**/.env.test', '**/.env.example') }}
+      - run: npm ci
       - name: Get build result artifact
         uses: actions/download-artifact@v4
         with:
           name: build_result
           path: dist/ 
-      - name: Get node_modules artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: node_modules
-          path: node_modules/ 
       - name: Run migrations
         run: npm run migration:test:run
       - name: Run ingegration tests
