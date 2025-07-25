@@ -28,17 +28,3 @@ $ npm run migration:run
 ```bash
 $ npm run migration:revert
 ```
-## connections
-
-### connect to the bastion host
-```bash
-$ aws ssm get-parameter --name /ec2/keypair/key-0d617db5fbc3f6c67 --with-decryption --query Parameter.Value --output text > ../bastion-key.pem
-$ chmod 400 ../bastion-key.pem
-$ ssh -i ../bastion-key.pem ec2-user@35.159.17.93
-```
-
-### ssh tunnel to aurora
-```bash
-ssh -i ../bastion-key.pem -L 5433:boilerplate6stack-boilerplate6auroradbc41949f5-vnajrernpof1.cluster-cniqg8kg8g2s.eu-central-1.rds.amazonaws.com:54
-32 ec2-user@35.159.17.93 -N
-```
