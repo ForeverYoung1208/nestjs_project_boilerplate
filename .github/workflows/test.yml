@@ -82,6 +82,7 @@ jobs:
         with:
           name: build_result
           path: dist/ 
+      - run: cp .env.test-ci .env.test -f
       - name: Run migrations
         run: npm run migration:test:run
       - name: Run ingegration tests
