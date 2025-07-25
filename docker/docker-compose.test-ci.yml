@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  postgres_test:
+    container_name: postgres_test
+    build:
+      dockerfile: postgres/Dockerfile
+    environment:
+      POSTGRES_DB: someproject_test
+      POSTGRES_USER: username_test
+      POSTGRES_PASSWORD: password_test
+    ports:
+      - 5432:5432
