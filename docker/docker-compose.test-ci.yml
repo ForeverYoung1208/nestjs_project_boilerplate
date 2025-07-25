@@ -13,7 +13,7 @@ services:
     ports:
       - 5432:5432
   redis_test:
-    container_name: postgres_test
+    container_name: redis_test
     image: redis:7.2.4
     ports:
       - 6379:6379
