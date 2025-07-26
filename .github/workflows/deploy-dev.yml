@@ -10,6 +10,11 @@ jobs:
   deploy-api:
     if: github.event.pull_request.merged
     runs-on: ubuntu-latest
+    env:
+      EB_BUCKET: ${{vars.EB_BUCKET}}
+      EB_APP_NAME: ${{vars.EB_APP_NAME}}
+      EB_API_ENV_NAME: ${{vars.EB_API_ENV_NAME}}
+      EB_WORKER_ENV_NAME: ${{vars.EB_WORKER_ENV_NAME}}
 
     steps:
       - name: Checkout
@@ -43,11 +48,33 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{vars.AWS_REGION}}
 
-      - if: ${{ steps.cache-api.outputs.cache-hit != 'true' }}
-        name: Deploy api with CDK
+      - name: Zip application
+        run: zip -r app.zip . -x ".git/*" ".github/*" "infra/" "docker/" "test/"
+
+      - name: Upload to S3
         run: |
-          npm install -g aws-cdk
-          cd infra
-          npm ci
-          npx cdk deploy --context targetEnv=dev --require-approval never
+          FILE_NAME="app-${{ github.sha }}.zip"
+          aws s3 cp app.zip s3://$EB_BUCKET/$FILE_NAME
+          echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
+
+      - name: Create new Elastic Beanstalk Application Version
+        run: |
+          VERSION_LABEL="v-${{ github.run_number }}-${{ github.sha }}"
+          aws elasticbeanstalk create-application-version \
+            --application-name "$EB_APP_NAME" \
+            --version-label $VERSION_LABEL \
+            --source-bundle S3Bucket="$EB_BUCKET",S3Key="$FILE_NAME"
+          echo "VERSION_LABEL=$VERSION_LABEL" >> $GITHUB_ENV
+
+      - name: Update Environment API
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name "$EB_API_ENV_NAME" \
+            --version-label "$VERSION_LABEL"
+
+      - name: Update Environment WORKER
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name "$EB_WORKER_ENV_NAME" \
+            --version-label "$VERSION_LABEL"
 

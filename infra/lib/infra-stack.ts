@@ -8,10 +8,10 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as s3assets from 'aws-cdk-lib/aws-s3-assets';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { SecretValue } from 'aws-cdk-lib';
 
 import { Construct } from 'constructs';
-
 
 export interface IAppStackConfig {
   databaseName: string;
@@ -346,7 +346,20 @@ export class AppStack extends cdk.Stack {
      *
      */
 
-    // Create an S3 asset for application code
+    // Create an S3 bucket to use while deploying with GA workflows using elastic beanstalk
+
+    const ebAppBucket = new s3.Bucket(this, 'ElasticBeanstalkAppBucket', {
+      bucketName: `${projectName.toLowerCase()}-eb-artifacts`,
+      versioned: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        {
+          expiration: cdk.Duration.days(30), // auto-cleanup old versions
+        },
+      ],
+    });
+
+    // Create an S3 asset for CDK to manage application code
 
     const appAsset = new s3assets.Asset(this, `${projectName}ApiAsset`, {
       path: '../', // Point to parent directory
@@ -833,6 +846,31 @@ export class AppStack extends cdk.Stack {
               `arn:aws:iam::${this.account}:role/cdk-hnb659fds-file-publishing-role-${this.account}-${this.region}`,
             ],
           }),
+
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: [
+              'elasticbeanstalk:CreateApplicationVersion',
+              'elasticbeanstalk:UpdateEnvironment',
+            ],
+            resources: [
+              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:application/${projectName}*`,
+              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:environment/${projectName}*/*`,
+            ],
+          }),
+
+          new iam.PolicyStatement({
+            actions: [
+              's3:PutObject',
+              's3:GetObject',
+              's3:ListBucket',
+              's3:DeleteObject',
+            ],
+            resources: [
+              `arn:aws:s3:::${projectName.toLowerCase()}-eb-artifacts`,
+              `arn:aws:s3:::${projectName.toLowerCase()}-eb-artifacts/*`,
+            ],
+          }),
         ],
       }),
     );
@@ -903,7 +941,29 @@ export class AppStack extends cdk.Stack {
       value: redis.attrRedisEndpointPort,
       description: 'Redis cluster port',
     });
+
+    new cdk.CfnOutput(this, 'ElasticBeanstalkAppBucketName', {
+      value: ebAppBucket.bucketName,
+      description: 'App bucket to use with elastic beanstalk deployments',
+    });
+
+    new cdk.CfnOutput(this, 'ApplicationName', {
+      value: app.applicationName,
+      description: 'ApplicationName',
+    });
+
+    new cdk.CfnOutput(this, 'ApiEnvironmentName', {
+      value: apiEnvironment.environmentName || 'undefined - Error!',
+      description: 'ApiEnvironmentName',
+    });
+
+    new cdk.CfnOutput(this, 'WorkerEnvironmentName', {
+      value: workerEnvironment.environmentName || 'undefined - Error!',
+      description: 'WorkerEnvironmentName',
+    });
   }
+
+  /// ===========
 
   private createApplicationVersion(
     app: elasticbeanstalk.CfnApplication,
