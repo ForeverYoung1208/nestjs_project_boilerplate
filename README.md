@@ -28,3 +28,18 @@ $ npm run migration:run
 ```bash
 $ npm run migration:revert
 ```
+
+## Github Workflows
+to make GA workflows deployment working, add to github secrets ad variables next variables
+```
+EB_BUCKET
+EB_APP_NAME
+EB_API_ENV_NAME
+EB_WORKER_ENV_NAME
+AWS_REGION
+```
+and secrets
+```
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
