@@ -22,7 +22,7 @@ jobs:
           cache-name: cache-api-files
         with:
           path: .
-          key: ${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*') }}
+          key: ${{ hashFiles('package*.json') }}-${{ hashFiles('src/**/*') }}
 
       - if: ${{ steps.cache-api.outputs.cache-hit == 'true' }}
         name: Check api changes
