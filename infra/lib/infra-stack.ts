@@ -763,22 +763,27 @@ export class AppStack extends cdk.Stack {
     });
 
     // Add explicit dependencies
+
     workerEnvironment.addDependency(
       workerSecurityGroup.node.defaultChild as cdk.CfnResource,
     );
-    workerEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
-
-    // Also add dependency for API environment
     apiEnvironment.addDependency(
       apiSecurityGroup.node.defaultChild as cdk.CfnResource,
     );
+
+    workerEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
     apiEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
 
     workerEnvironment.addDependency(
       // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
       dbCluster.node.defaultChild as cdk.CfnResource,
     );
+    apiEnvironment.addDependency(
+      dbCluster.node.defaultChild as cdk.CfnResource,
+    );
+
     workerEnvironment.addDependency(redis);
+    apiEnvironment.addDependency(redis);
 
     // Add IAM user to deploy code
     const userDeploer = new iam.User(this, `${projectName}Deployer`, {
@@ -913,8 +918,7 @@ export class AppStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ApiInstancePublicDNS', {
-      value:
-        'aws ec2 describe-instances --filters "Name=tag:elasticbeanstalk:environment-name,Values=boilerplate-Api-Environment" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].PublicDnsName" --output text',
+      value: `aws ec2 describe-instances --filters "Name=tag:elasticbeanstalk:environment-name,Values=${apiEnvironment.environmentName}" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].PublicDnsName" --output text`,
       description: 'Command to get API instance public DNS for SSH access',
     });
 
