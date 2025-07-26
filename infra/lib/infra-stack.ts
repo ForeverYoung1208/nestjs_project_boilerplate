@@ -768,16 +768,16 @@ export class AppStack extends cdk.Stack {
     workerEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
     apiEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
 
-    workerEnvironment.addDependency(
-      // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
-      dbCluster.node.defaultChild as cdk.CfnResource,
-    );
-    apiEnvironment.addDependency(
-      dbCluster.node.defaultChild as cdk.CfnResource,
-    );
+    // workerEnvironment.addDependency(
+    //   // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
+    //   dbCluster.node.defaultChild as cdk.CfnResource,
+    // );
+    // apiEnvironment.addDependency(
+    //   dbCluster.node.defaultChild as cdk.CfnResource,
+    // );
 
-    workerEnvironment.addDependency(redis);
-    apiEnvironment.addDependency(redis);
+    // workerEnvironment.addDependency(redis);
+    // apiEnvironment.addDependency(redis);
 
     // Add IAM user to deploy code
     const userDeploer = new iam.User(this, `${projectName}Deployer`, {
@@ -847,18 +847,6 @@ export class AppStack extends cdk.Stack {
           }),
 
           new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: [
-              'elasticbeanstalk:CreateApplicationVersion',
-              'elasticbeanstalk:UpdateEnvironment',
-            ],
-            resources: [
-              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:application/${projectName}*`,
-              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:environment/${projectName}*/*`,
-            ],
-          }),
-
-          new iam.PolicyStatement({
             actions: [
               's3:PutObject',
               's3:GetObject',
@@ -868,6 +856,18 @@ export class AppStack extends cdk.Stack {
             resources: [
               `arn:aws:s3:::${projectName.toLowerCase()}-eb-artifacts`,
               `arn:aws:s3:::${projectName.toLowerCase()}-eb-artifacts/*`,
+            ],
+          }),
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: [
+              'elasticbeanstalk:CreateApplicationVersion',
+              'elasticbeanstalk:UpdateEnvironment',
+            ],
+            resources: [
+              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:application/${projectName}-application`,
+              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:applicationversion/${projectName}-application/*`,
+              `arn:aws:elasticbeanstalk:${this.region}:${this.account}:environment/${projectName}-application/${projectName}*`,
             ],
           }),
         ],
