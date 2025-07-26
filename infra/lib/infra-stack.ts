@@ -768,16 +768,16 @@ export class AppStack extends cdk.Stack {
     workerEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
     apiEnvironment.addDependency(vpc.node.defaultChild as cdk.CfnResource);
 
-    workerEnvironment.addDependency(
-      // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
-      dbCluster.node.defaultChild as cdk.CfnResource,
-    );
-    apiEnvironment.addDependency(
-      dbCluster.node.defaultChild as cdk.CfnResource,
-    );
+    // workerEnvironment.addDependency(
+    //   // addDependency expects a CfnResource type, but DatabaseCluster is a higher-level construct. Access the underlying CloudFormation resource using the node.defaultChild property
+    //   dbCluster.node.defaultChild as cdk.CfnResource,
+    // );
+    // apiEnvironment.addDependency(
+    //   dbCluster.node.defaultChild as cdk.CfnResource,
+    // );
 
-    workerEnvironment.addDependency(redis);
-    apiEnvironment.addDependency(redis);
+    // workerEnvironment.addDependency(redis);
+    // apiEnvironment.addDependency(redis);
 
     // Add IAM user to deploy code
     const userDeploer = new iam.User(this, `${projectName}Deployer`, {
