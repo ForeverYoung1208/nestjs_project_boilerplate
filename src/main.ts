@@ -27,9 +27,9 @@ export async function bootstrap() {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('API')
       .setDescription(
-        `Api description for environment ${currentEnv} version test2`,
+        `Api description for environment ${currentEnv} version test3`,
       )
-      .setVersion('test2')
+      .setVersion('test3')
       .addBearerAuth(
         {
           type: 'http',
