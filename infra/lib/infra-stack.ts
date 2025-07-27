@@ -892,7 +892,12 @@ export class AppStack extends cdk.Stack {
           // Auto Scaling permissions
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
-            actions: ['autoscaling:Describe*'],
+            actions: [
+              'autoscaling:Describe*',
+              'autoscaling:SuspendProcesses',
+              'autoscaling:ResumeProcesses',
+              'autoscaling:UpdateAutoScalingGroup',
+            ],
             resources: ['*'],
           }),
         ],
