@@ -900,6 +900,12 @@ export class AppStack extends cdk.Stack {
             ],
             resources: ['*'],
           }),
+          // CloudWatch Logs permissions
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ['logs:*'],
+            resources: ['*'],
+          }),
         ],
       }),
     );
