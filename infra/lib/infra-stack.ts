@@ -352,6 +352,7 @@ export class AppStack extends cdk.Stack {
       bucketName: `${projectName.toLowerCase()}-eb-artifacts`,
       versioned: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
     });
 
     // Create an S3 asset for CDK to manage application code
@@ -833,7 +834,12 @@ export class AppStack extends cdk.Stack {
             actions: [
               's3:CreateBucket',
               's3:GetBucketLocation',
-              's3:ListAllMyBuckets',
+              's3:ListBucket',
+              's3:GetObject',
+              's3:PutObject',
+              's3:DeleteObject',
+              's3:GetBucketVersioning',
+              's3:PutBucketVersioning',
             ],
             resources: [
               `arn:aws:s3:::elasticbeanstalk-${this.region}-${this.account}`,
