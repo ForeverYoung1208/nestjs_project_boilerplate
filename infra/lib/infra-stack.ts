@@ -351,6 +351,7 @@ export class AppStack extends cdk.Stack {
     const ebAppBucket = new s3.Bucket(this, 'ElasticBeanstalkAppBucket', {
       bucketName: `${projectName.toLowerCase()}-eb-artifacts`,
       versioned: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     // Create an S3 asset for CDK to manage application code
@@ -796,38 +797,7 @@ export class AppStack extends cdk.Stack {
               `arn:aws:ssm:${this.region}:${this.account}:parameter/${projectName}*`,
             ],
           }),
-          new iam.PolicyStatement({
-            actions: [
-              'cloudformation:DescribeStacks',
-              'cloudformation:GetTemplate',
-              'cloudformation:GetTemplateSummary',
-              'cloudformation:DescribeStackEvents',
-              'cloudformation:DescribeStackResources',
-              'cloudformation:ListStackResources',
-              'cloudformation:ListStacks',
-              'cloudformation:DescribeChangeSet',
-              'cloudformation:TagResource',
-              'cloudformation:ValidateTemplate',
-            ],
-            effect: iam.Effect.ALLOW,
-            resources: ['*'],
-          }),
-          new iam.PolicyStatement({
-            effect: iam.Effect.ALLOW,
-            actions: [
-              'cloudformation:CreateStack',
-              'cloudformation:UpdateStack',
-              'cloudformation:DeleteStack',
-              'cloudformation:CreateChangeSet',
-              'cloudformation:ExecuteChangeSet',
-              'cloudformation:DeleteChangeSet',
-              'cloudformation:SetStackPolicy',
-            ],
-            resources: [
-              `arn:aws:cloudformation:${this.region}:${this.account}:stack/${this.stackName}/*`,
-              `arn:aws:cloudformation:${this.region}:${this.account}:stack/CDK*/*`,
-            ],
-          }),
+
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             actions: ['s3:*'],
@@ -858,6 +828,19 @@ export class AppStack extends cdk.Stack {
               `arn:aws:s3:::${projectName.toLowerCase()}-eb-artifacts/*`,
             ],
           }),
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: [
+              's3:CreateBucket',
+              's3:GetBucketLocation',
+              's3:ListAllMyBuckets',
+            ],
+            resources: [
+              `arn:aws:s3:::elasticbeanstalk-${this.region}-${this.account}`,
+              `arn:aws:s3:::elasticbeanstalk-${this.region}-${this.account}/*`,
+            ],
+          }),
+
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             actions: [
