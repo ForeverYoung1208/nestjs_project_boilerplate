@@ -846,12 +846,10 @@ export class AppStack extends cdk.Stack {
             effect: iam.Effect.ALLOW,
             actions: [
               's3:CreateBucket',
-              's3:GetBucketLocation',
+              's3:Get*',
               's3:ListBucket',
-              's3:GetObject',
               's3:PutObject',
               's3:DeleteObject',
-              's3:GetBucketVersioning',
               's3:PutBucketVersioning',
             ],
             resources: [
@@ -874,19 +872,27 @@ export class AppStack extends cdk.Stack {
           }),
           new iam.PolicyStatement({
             actions: [
-              'cloudformation:DescribeStacks',
-              'cloudformation:GetTemplate',
-              'cloudformation:GetTemplateSummary',
-              'cloudformation:DescribeStackEvents',
-              'cloudformation:DescribeStackResources',
-              'cloudformation:ListStackResources',
-              'cloudformation:ListStacks',
-              'cloudformation:DescribeChangeSet',
+              'cloudformation:Describe*',
+              'cloudformation:Get*',
+              'cloudformation:List*',
               'cloudformation:TagResource',
               'cloudformation:ValidateTemplate',
             ],
             effect: iam.Effect.ALLOW,
             resources: ['*'], // EB creates stacks with unpredictable names
+          }),
+          // EC2 permissions for EB environment management
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ['ec2:Describe*'],
+            resources: ['*'],
+          }),
+
+          // Auto Scaling permissions
+          new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ['autoscaling:Describe*'],
+            resources: ['*'],
           }),
         ],
       }),
