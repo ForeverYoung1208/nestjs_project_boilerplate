@@ -351,6 +351,7 @@ export class AppStack extends cdk.Stack {
     const ebAppBucket = new s3.Bucket(this, 'ElasticBeanstalkAppBucket', {
       bucketName: `${projectName.toLowerCase()}-eb-artifacts`,
       versioned: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     // Create an S3 asset for CDK to manage application code
