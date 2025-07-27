@@ -397,6 +397,19 @@ export class AppStack extends cdk.Stack {
         ],
       }),
     );
+    ebInstanceRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'ec2:DescribeSubnets',
+          'ec2:DescribeVpcs',
+          'ec2:DescribeSecurityGroups',
+          's3:GetObjectAcl',
+          's3:PutObjectAcl',
+        ],
+        resources: ['*'],
+      }),
+    );    
 
     // Create instance profile
     const ebInstanceProfile = new iam.CfnInstanceProfile(
