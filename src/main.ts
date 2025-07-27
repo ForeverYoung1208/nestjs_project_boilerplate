@@ -27,7 +27,9 @@ export async function bootstrap() {
     const apiVersion = process.env.npm_package_version;
     const swaggerConfig = new DocumentBuilder()
       .setTitle('API')
-      .setDescription(`Api description for environment '${currentEnv}'`)
+      .setDescription(
+        `Api description for environment '${currentEnv} version ${apiVersion}`,
+      )
       .setVersion(apiVersion)
       .addBearerAuth(
         {
