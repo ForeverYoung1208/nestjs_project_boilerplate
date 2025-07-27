@@ -7,7 +7,6 @@ import { ENV_DEV, ENV_LOCAL, ENV_STAGING } from './constants/system';
 import { validationPipeConfig } from './config/validation-pipe.config';
 import { AuthTypes } from './modules/auth/constants';
 import { initializeTransactionalContext } from 'typeorm-transactional';
-import * as packageJson from '../package.json';
 
 export async function bootstrap() {
   initializeTransactionalContext();
@@ -25,13 +24,12 @@ export async function bootstrap() {
 
   // Load swagger, load only for local, staging and dev environments
   if ([ENV_LOCAL, ENV_STAGING, ENV_DEV].includes(currentEnv)) {
-    const apiVersion = packageJson.version;
     const swaggerConfig = new DocumentBuilder()
       .setTitle('API')
       .setDescription(
-        `Api description for environment ${currentEnv} version ${apiVersion} + test1`,
+        `Api description for environment ${currentEnv} version test2`,
       )
-      .setVersion(apiVersion)
+      .setVersion('test2')
       .addBearerAuth(
         {
           type: 'http',
