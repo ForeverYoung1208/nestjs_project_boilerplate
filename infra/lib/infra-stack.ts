@@ -482,7 +482,7 @@ export class AppStack extends cdk.Stack {
         {
           namespace: 'aws:ec2:instances',
           optionName: 'InstanceTypes',
-          value: 't2.nano',
+          value: 't3.medium', // todo: reduce after debugging
         },
         {
           namespace: 'aws:elasticbeanstalk:cloudwatch:logs',
@@ -858,6 +858,22 @@ export class AppStack extends cdk.Stack {
               `arn:aws:elasticbeanstalk:${this.region}:${this.account}:applicationversion/${projectName}-application/*`,
               `arn:aws:elasticbeanstalk:${this.region}:${this.account}:environment/${projectName}-application/${projectName}*`,
             ],
+          }),
+          new iam.PolicyStatement({
+            actions: [
+              'cloudformation:DescribeStacks',
+              'cloudformation:GetTemplate',
+              'cloudformation:GetTemplateSummary',
+              'cloudformation:DescribeStackEvents',
+              'cloudformation:DescribeStackResources',
+              'cloudformation:ListStackResources',
+              'cloudformation:ListStacks',
+              'cloudformation:DescribeChangeSet',
+              'cloudformation:TagResource',
+              'cloudformation:ValidateTemplate',
+            ],
+            effect: iam.Effect.ALLOW,
+            resources: ['*'], // EB creates stacks with unpredictable names
           }),
         ],
       }),
