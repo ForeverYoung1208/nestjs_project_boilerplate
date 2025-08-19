@@ -2,7 +2,9 @@
 
 ## Useful commands
 
-* `npx cdk deploy`  deploy this stack to your default AWS account/region
+* `cdk deploy --context targetEnv=dev`  deploy this stack to your default AWS account/region
+* `cdk deploy --context targetEnv=dev --no-rollback` deploy this stack from your default AWS account/region without rollback. FASTER AND LEAVES STACK IN A FAILED STATE
+* `cdk destroy --context targetEnv=dev` destroy this stack from your default AWS account/region
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
 

@@ -520,6 +520,10 @@ export class AppStack extends cdk.Stack {
       {
         environmentName: `${projectName}-Api-Environment`,
         applicationName: app.applicationName,
+        tier: {
+          name: 'WebServer',
+          type: 'Standard',
+        },
         solutionStackName: '64bit Amazon Linux 2023 v6.6.0 running Node.js 22', // Choose appropriate platform
         optionSettings: [
           ...commonOptionSettings,
@@ -618,6 +622,10 @@ export class AppStack extends cdk.Stack {
         environmentName: `${projectName}-Worker-Environment`,
         applicationName: app.applicationName,
         solutionStackName: '64bit Amazon Linux 2023 v6.6.0 running Node.js 22', // Choose appropriate platform
+        tier: {
+          name: 'Worker',
+          type: 'SQS/HTTP',
+        },
         optionSettings: [
           ...commonOptionSettings,
           {
@@ -765,11 +773,13 @@ export class AppStack extends cdk.Stack {
      *
      */
 
-    new route53.CnameRecord(this, `${projectName}ApiAlias`, {
+    const apiAlias = new route53.CnameRecord(this, `${projectName}ApiAlias`, {
       zone,
       recordName: fullSubDomainNameApi,
       domainName: apiEnvironment.attrEndpointUrl,
     });
+
+    apiAlias.node.addDependency(apiEnvironment);
 
     // Add explicit dependencies
 
@@ -953,7 +963,7 @@ export class AppStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'WorkerInstanceAddress', {
-      value: workerEnvironment.attrEndpointUrl,
+      value: `aws ec2 describe-instances --filters "Name=tag:elasticbeanstalk:environment-name,Values=${workerEnvironment.environmentName}" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].PublicIpAddress" --output text`,
       description:
         'IP(case single instance)/URL(case ALB) of the WORKER instance',
     });
