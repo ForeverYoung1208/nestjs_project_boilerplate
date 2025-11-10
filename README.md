@@ -1,3 +1,7 @@
+# This repo implements the next deployment variant
+- API + Worker, both in their separate EB environments
+- Auoroa posgres
+- Redis ElastiCache
 
 
 ## MIGRATIONS
